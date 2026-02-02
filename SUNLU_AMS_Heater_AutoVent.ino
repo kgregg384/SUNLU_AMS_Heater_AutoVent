@@ -1,14 +1,47 @@
-// debug.ino - Enhanced ACS758 current sensor debugging with servo control
-// Displays rolling 30-second average, offset-corrected readings, and device state
-// Includes serial commands for manual vent control
-//
-// Board: Seeed XIAO SAMD21 (3.3V)
-// Peripherals: ADS1115 (I2C), ACS758 connected to ADS channel 0, Servo on pin 8
+/*
+ * SUNLU AMS Heater Auto-Vent Controller
+ *
+ * Automated vent control system for 3D printer filament dryers based on current monitoring.
+ * Detects heater and fan operation via AC current sensing and automatically controls a
+ * servo-operated vent to manage humidity and heat dissipation.
+ *
+ * Features:
+ * - Automatic current-based heater/fan detection
+ * - Servo-controlled vent with position feedback
+ * - Self-learning threshold calibration mode
+ * - EEPROM storage for learned parameters
+ * - LED status indication
+ * - Button-based user interface
+ * - 3-minute fan cooldown delay
+ *
+ * Hardware:
+ * - Board: Seeed XIAO SAMD21 (3.3V, 48MHz ARM Cortex-M0+)
+ * - Current Sensor: ACS758 LCB-050B (AC current, 40mV/A sensitivity)
+ * - ADC: ADS1115 16-bit I2C ADC (±4.096V range)
+ * - Servo: Feedback-enabled servo motor
+ * - LED: Status indicator (active low)
+ * - Button: Momentary push button (active low, internal pullup)
+ *
+ * Pin Configuration:
+ * - Pin 0 (D0): Servo PWM output
+ * - Pin 3 (D3): Button input (active low, internal pullup)
+ * - Pin 10 (D10): Status LED (active low)
+ * - SDA/SCL: I2C bus for ADS1115
+ *
+ * ADS1115 Channel Mapping:
+ * - A0: ACS758 current sensor output
+ * - A1: Servo position feedback
+ *
+ * Author: Generated with Claude Code
+ * License: MIT
+ * Version: 1.0
+ */
   
 #include <Wire.h>
 #include <Adafruit_ADS1X15.h>
 #include <Servo.h>
 #include <math.h>
+#include <FlashStorage.h>  // SAMD21 EEPROM emulation
 
 // ----------------- Constants -----------------
 #define ADS_CH_CURRENT   0   // ACS758 -> ADS A0
@@ -24,17 +57,12 @@ static const uint32_t OFFSET_MEASURE_MS = 5000; // 5 seconds to measure offset a
 static const uint32_t ROLLING_AVG_MS = 30000;   // 30 second rolling average window
 static const uint8_t MAX_SAMPLES = 60;          // Store 60 samples (30 seconds at 0.5s per sample)
 
-// Detection thresholds - CALIBRATE THESE AFTER MEASURING YOUR SYSTEM!
-// Run this debug program through a full dryer cycle to see actual current values
-// Then adjust these thresholds to match your observations
-//
-// Note: ACS758 has ~50-75mA noise floor at low currents. Thresholds must be above this.
-// For vent control, you likely only need "ACTIVITY" detection vs "IDLE"
-// since low heat may not be distinguishable from fan-only operation.
-static const float HEATER_ON_THRESHOLD  = 0.200f;  // Above this = heater on (200mA)
-static const float HEATER_OFF_THRESHOLD = 0.120f;  // Below this = heater off (120mA)
-static const float FAN_ON_THRESHOLD     = 0.120f;  // Above this = fan on (120mA, well above noise)
-static const float FAN_OFF_THRESHOLD    = 0.080f;  // Below this = fan off (80mA, with hysteresis)
+// Detection thresholds - Can be learned or set manually
+// These defaults will be used if no learned values are stored in EEPROM
+static float HEATER_ON_THRESHOLD  = 0.200f;  // Above this = heater on (200mA)
+static float HEATER_OFF_THRESHOLD = 0.120f;  // Below this = heater off (120mA)
+static float FAN_ON_THRESHOLD     = 0.025f;  // Above this = fan on (25mA, above baseline ~13mA)
+static float FAN_OFF_THRESHOLD    = 0.020f;  // Below this = fan off (20mA, with hysteresis)
 
 // Simple activity detection - anything running vs completely idle
 // This is what you'll likely use for actual vent control
@@ -89,12 +117,175 @@ static const uint32_t LED_FLASH_INTERVAL = 250;  // Flash every 250ms during cal
 bool g_lastButtonState = HIGH;
 uint32_t g_buttonPressStart = 0;
 bool g_buttonHandled = false;
-static const uint32_t LONG_PRESS_MS = 2000;  // 2 second long press
+static const uint32_t LONG_PRESS_MS = 2000;   // 2 second long press
+static const uint32_t VLONG_PRESS_MS = 5000;  // 5 second very long press for learning mode
 
 // System power state (standby mode)
 bool g_systemOn = true;
 
+// Learning mode state
+enum LearningPhase {
+  LEARN_NONE = 0,
+  LEARN_BASELINE,
+  LEARN_HEATER,
+  LEARN_FAN_ONLY,
+  LEARN_COMPLETE
+};
+LearningPhase g_learningPhase = LEARN_NONE;
+float g_learnedBaseline = 0.0f;
+float g_learnedHeater = 0.0f;
+float g_learnedFanOnly = 0.0f;
+uint32_t g_learningStartMs = 0;  // When measurement started (0 = in prep phase)
+uint32_t g_learningPhaseEntryMs = 0;  // When phase was entered
+static const uint32_t LEARNING_MEASURE_MS = 10000;  // 10 seconds per phase
+static const uint32_t LEARNING_PREP_MS = 5000;  // 5 seconds prep time before auto-start
+
+// LED patterns
+enum LEDPattern {
+  LED_SOLID,
+  LED_FAST_FLASH,      // 100ms - learning mode active
+  LED_SLOW_FLASH,      // 250ms - calibration
+  LED_DOUBLE_BLINK,    // Double blink pattern
+  LED_BREATHING,       // Slow breathing pattern
+  LED_SUCCESS_BLINK,   // 2 quick flashes
+  LED_COMPLETE_BLINK,  // 3 long flashes
+  LED_OFF
+};
+LEDPattern g_ledPattern = LED_SOLID;
+uint32_t g_ledPatternStart = 0;
+
+// EEPROM structure for storing learned thresholds
+struct ThresholdData {
+  uint32_t magic;  // Magic number to verify valid data
+  float fanOnThreshold;
+  float fanOffThreshold;
+  float heaterOnThreshold;
+  float heaterOffThreshold;
+};
+static const uint32_t EEPROM_MAGIC = 0xABCD1234;
+FlashStorage(thresholdStorage, ThresholdData);
+
 // ----------------- Helper Functions -----------------
+
+// LED pattern handler - call this frequently from loop()
+void updateLEDPattern() {
+  uint32_t now = millis();
+  uint32_t elapsed = now - g_ledPatternStart;
+
+  switch (g_ledPattern) {
+    case LED_SOLID:
+      digitalWrite(LED_PIN, HIGH);
+      digitalWrite(LED_BUILTIN, HIGH);
+      break;
+
+    case LED_FAST_FLASH:  // 100ms on/off for learning mode
+      if (now - g_lastLedToggle >= 100) {
+        g_ledState = !g_ledState;
+        digitalWrite(LED_PIN, g_ledState);
+        digitalWrite(LED_BUILTIN, g_ledState);
+        g_lastLedToggle = now;
+      }
+      break;
+
+    case LED_SLOW_FLASH:  // 250ms on/off for calibration
+      if (now - g_lastLedToggle >= 250) {
+        g_ledState = !g_ledState;
+        digitalWrite(LED_PIN, g_ledState);
+        digitalWrite(LED_BUILTIN, g_ledState);
+        g_lastLedToggle = now;
+      }
+      break;
+
+    case LED_DOUBLE_BLINK:  // Double blink every 2 seconds
+      if (elapsed < 150) {
+        digitalWrite(LED_PIN, HIGH);
+        digitalWrite(LED_BUILTIN, HIGH);
+      } else if (elapsed < 300) {
+        digitalWrite(LED_PIN, LOW);
+        digitalWrite(LED_BUILTIN, LOW);
+      } else if (elapsed < 450) {
+        digitalWrite(LED_PIN, HIGH);
+        digitalWrite(LED_BUILTIN, HIGH);
+      } else if (elapsed < 2000) {
+        digitalWrite(LED_PIN, LOW);
+        digitalWrite(LED_BUILTIN, LOW);
+      } else {
+        g_ledPatternStart = now;
+      }
+      break;
+
+    case LED_BREATHING:  // Slow breathing pattern using PWM
+      {
+        // Simple approximation using on/off timing
+        uint32_t cycle = elapsed % 2000;
+        if (cycle < 1000) {
+          // Fade in - use simple threshold
+          digitalWrite(LED_PIN, cycle > 500 ? HIGH : (cycle % 100 < 50 ? HIGH : LOW));
+          digitalWrite(LED_BUILTIN, cycle > 500 ? HIGH : (cycle % 100 < 50 ? HIGH : LOW));
+        } else {
+          // Fade out
+          uint32_t fadeOut = cycle - 1000;
+          digitalWrite(LED_PIN, fadeOut < 500 ? HIGH : (fadeOut % 100 < 50 ? HIGH : LOW));
+          digitalWrite(LED_BUILTIN, fadeOut < 500 ? HIGH : (fadeOut % 100 < 50 ? HIGH : LOW));
+        }
+      }
+      break;
+
+    case LED_SUCCESS_BLINK:  // 2 quick flashes then return to solid
+      if (elapsed < 150) {
+        digitalWrite(LED_PIN, HIGH);
+        digitalWrite(LED_BUILTIN, HIGH);
+      } else if (elapsed < 300) {
+        digitalWrite(LED_PIN, LOW);
+        digitalWrite(LED_BUILTIN, LOW);
+      } else if (elapsed < 450) {
+        digitalWrite(LED_PIN, HIGH);
+        digitalWrite(LED_BUILTIN, HIGH);
+      } else if (elapsed < 600) {
+        digitalWrite(LED_PIN, LOW);
+        digitalWrite(LED_BUILTIN, LOW);
+      } else {
+        g_ledPattern = LED_SOLID;
+      }
+      break;
+
+    case LED_COMPLETE_BLINK:  // 3 long flashes then return to solid
+      if (elapsed < 500) {
+        digitalWrite(LED_PIN, HIGH);
+        digitalWrite(LED_BUILTIN, HIGH);
+      } else if (elapsed < 1000) {
+        digitalWrite(LED_PIN, LOW);
+        digitalWrite(LED_BUILTIN, LOW);
+      } else if (elapsed < 1500) {
+        digitalWrite(LED_PIN, HIGH);
+        digitalWrite(LED_BUILTIN, HIGH);
+      } else if (elapsed < 2000) {
+        digitalWrite(LED_PIN, LOW);
+        digitalWrite(LED_BUILTIN, LOW);
+      } else if (elapsed < 2500) {
+        digitalWrite(LED_PIN, HIGH);
+        digitalWrite(LED_BUILTIN, HIGH);
+      } else if (elapsed < 3000) {
+        digitalWrite(LED_PIN, LOW);
+        digitalWrite(LED_BUILTIN, LOW);
+      } else {
+        g_ledPattern = LED_SOLID;
+      }
+      break;
+
+    case LED_OFF:
+      digitalWrite(LED_PIN, LOW);
+      digitalWrite(LED_BUILTIN, LOW);
+      break;
+  }
+}
+
+// Set LED pattern
+void setLEDPattern(LEDPattern pattern) {
+  g_ledPattern = pattern;
+  g_ledPatternStart = millis();
+  g_lastLedToggle = millis();
+}
 
 // Delay while flashing LED (for calibration)
 void delayWithFlashing(uint32_t ms) {
@@ -338,30 +529,15 @@ void calibrateFromCurrentPosition() {
     delay(50);
   }
 
-  // Sweep to find min/max feedback positions
-  Serial.println(F("\nSweeping to find servo range..."));
+  // Use fixed servo positions (no slow sweep to avoid sticking)
+  Serial.println(F("\nUsing fixed servo positions..."));
 
-  float minFb = 1.0f, maxFb = 0.0f;
-  int minFbDeg = 0, maxFbDeg = 180;
+  // Physical servo is reversed, so we use swapped values
+  SERVO_CLOSED_DEG = 180;  // Max position for closed
+  SERVO_OPEN_DEG = 0;      // Min position for open
 
-  for (int deg = 0; deg <= 180; deg += 5) {
-    servo.write(deg);
-    delay(50);
-    float fb = readServoFeedback01();
-
-    if (deg % 30 == 0) {
-      Serial.print(F("  "));
-      Serial.print(deg);
-      Serial.print(F("deg = "));
-      Serial.println(fb, 4);
-    }
-
-    if (fb < minFb) { minFb = fb; minFbDeg = deg; }
-    if (fb > maxFb) { maxFb = fb; maxFbDeg = deg; }
-  }
-
-  SERVO_CLOSED_DEG = minFbDeg;
-  SERVO_OPEN_DEG = maxFbDeg;
+  Serial.println(F("  CLOSED position: 180 deg"));
+  Serial.println(F("  OPEN position: 0 deg"));
 
   // Calibrate feedback at each position
   Serial.println(F("\nCalibrating feedback..."));
@@ -402,8 +578,8 @@ void calibrateFromCurrentPosition() {
 // Run full calibration (servo + current offset)
 // Called at startup and when button is pressed
 void runFullCalibration() {
-  g_calibrated = false;  // Start flashing LED
-  digitalWrite(LED_BUILTIN, LOW);
+  g_calibrated = false;  // Mark as not calibrated
+  setLEDPattern(LED_SLOW_FLASH);  // Flash LED during calibration
 
   Serial.println(F("\n========================================"));
   Serial.println(F("FULL CALIBRATION STARTING"));
@@ -419,42 +595,15 @@ void runFullCalibration() {
   servo.attach(SERVO_PWM_PIN);
   delayWithFlashing(100);
 
-  // Sweep from 0 to 180 degrees to find working range
-  Serial.println(F("\nSweeping to find servo range..."));
+  // Use fixed servo positions (no slow sweep to avoid sticking)
+  Serial.println(F("\nUsing fixed servo positions..."));
 
-  float minFb = 1.0f, maxFb = 0.0f;
-  int minFbDeg = 0, maxFbDeg = 180;
+  // Physical servo is reversed, so we use swapped values
+  SERVO_CLOSED_DEG = 180;  // Max position for closed
+  SERVO_OPEN_DEG = 0;      // Min position for open
 
-  for (int deg = 0; deg <= 180; deg += 5) {
-    servo.write(deg);
-    delayWithFlashing(50);
-    float fb = readServoFeedback01();
-
-    if (deg % 30 == 0) {
-      Serial.print(F("  "));
-      Serial.print(deg);
-      Serial.print(F("deg = "));
-      Serial.println(fb, 4);
-    }
-
-    if (fb < minFb) { minFb = fb; minFbDeg = deg; }
-    if (fb > maxFb) { maxFb = fb; maxFbDeg = deg; }
-  }
-
-  SERVO_CLOSED_DEG = minFbDeg;
-  SERVO_OPEN_DEG = maxFbDeg;
-
-  Serial.println(F("\nSweep results:"));
-  Serial.print(F("  Min feedback "));
-  Serial.print(minFb, 4);
-  Serial.print(F(" at "));
-  Serial.print(minFbDeg);
-  Serial.println(F(" deg"));
-  Serial.print(F("  Max feedback "));
-  Serial.print(maxFb, 4);
-  Serial.print(F(" at "));
-  Serial.print(maxFbDeg);
-  Serial.println(F(" deg"));
+  Serial.println(F("  CLOSED position: 180 deg"));
+  Serial.println(F("  OPEN position: 0 deg"));
 
   // Calibrate feedback at each position
   Serial.println(F("\nCalibrating feedback at each position..."));
@@ -519,8 +668,7 @@ void runFullCalibration() {
   g_heaterOn = false;
   g_systemActive = false;
 
-  digitalWrite(LED_PIN, HIGH);
-  digitalWrite(LED_BUILTIN, HIGH);
+  setLEDPattern(LED_SOLID);  // Set LED to solid on after calibration
 
   // Allow sensor to settle after calibration
   Serial.println(F("\nAllowing sensor to settle (3 seconds)..."));
@@ -543,9 +691,7 @@ void enterStandbyMode() {
   g_ventClosePending = false;
 
   // Turn off LED
-  digitalWrite(LED_PIN, LOW);
-  digitalWrite(LED_BUILTIN, LOW);
-  g_ledState = false;
+  setLEDPattern(LED_OFF);
 
   // Set system off
   g_systemOn = false;
@@ -553,6 +699,229 @@ void enterStandbyMode() {
   Serial.println(F("System is now in STANDBY"));
   Serial.println(F("Long press button to wake up"));
   Serial.println(F("========================================\n"));
+}
+
+// Load thresholds from EEPROM
+bool loadThresholdsFromEEPROM() {
+  ThresholdData data = thresholdStorage.read();
+
+  if (data.magic == EEPROM_MAGIC) {
+    FAN_ON_THRESHOLD = data.fanOnThreshold;
+    FAN_OFF_THRESHOLD = data.fanOffThreshold;
+    HEATER_ON_THRESHOLD = data.heaterOnThreshold;
+    HEATER_OFF_THRESHOLD = data.heaterOffThreshold;
+
+    Serial.println(F("\n=== Loaded thresholds from EEPROM ==="));
+    Serial.print(F("  Fan ON:  ")); Serial.print(FAN_ON_THRESHOLD, 4); Serial.println(F("A"));
+    Serial.print(F("  Fan OFF: ")); Serial.print(FAN_OFF_THRESHOLD, 4); Serial.println(F("A"));
+    Serial.print(F("  Heat ON: ")); Serial.print(HEATER_ON_THRESHOLD, 4); Serial.println(F("A"));
+    Serial.print(F("  Heat OFF:")); Serial.print(HEATER_OFF_THRESHOLD, 4); Serial.println(F("A"));
+    Serial.println(F("=======================================\n"));
+    return true;
+  }
+
+  Serial.println(F("No learned thresholds found, using defaults"));
+  return false;
+}
+
+// Save thresholds to EEPROM
+void saveThresholdsToEEPROM() {
+  ThresholdData data;
+  data.magic = EEPROM_MAGIC;
+  data.fanOnThreshold = FAN_ON_THRESHOLD;
+  data.fanOffThreshold = FAN_OFF_THRESHOLD;
+  data.heaterOnThreshold = HEATER_ON_THRESHOLD;
+  data.heaterOffThreshold = HEATER_OFF_THRESHOLD;
+
+  thresholdStorage.write(data);
+
+  Serial.println(F("\n=== Saved thresholds to EEPROM ==="));
+  Serial.print(F("  Fan ON:  ")); Serial.print(FAN_ON_THRESHOLD, 4); Serial.println(F("A"));
+  Serial.print(F("  Fan OFF: ")); Serial.print(FAN_OFF_THRESHOLD, 4); Serial.println(F("A"));
+  Serial.print(F("  Heat ON: ")); Serial.print(HEATER_ON_THRESHOLD, 4); Serial.println(F("A"));
+  Serial.print(F("  Heat OFF:")); Serial.print(HEATER_OFF_THRESHOLD, 4); Serial.println(F("A"));
+  Serial.println(F("===================================\n"));
+}
+
+// Start learning mode
+void startLearningMode() {
+  Serial.println(F("\n========================================"));
+  Serial.println(F("ENTERING LEARNING MODE"));
+  Serial.println(F("========================================"));
+  Serial.println(F("This will learn optimal thresholds"));
+  Serial.println(F("Follow LED patterns:"));
+  Serial.println(F("  SOLID = Get ready"));
+  Serial.println(F("  FAST FLASH = Measuring now"));
+  Serial.println(F("  SUCCESS BLINK = Phase complete"));
+  Serial.println(F("  BREATHING = Turn dryer ON (heater+fan)"));
+  Serial.println(F("  DOUBLE BLINK = Turn heater OFF (fan only)"));
+  Serial.println(F("  COMPLETE BLINK = All done!"));
+  Serial.println(F("========================================\n"));
+
+  g_learningPhase = LEARN_BASELINE;
+  g_learnedBaseline = 0.0f;
+  g_learnedHeater = 0.0f;
+  g_learnedFanOnly = 0.0f;
+  g_learningStartMs = 0;  // Not measuring yet
+  g_learningPhaseEntryMs = millis();  // Mark when we entered this phase
+
+  // Start with solid LED - user has 5 seconds to prepare
+  setLEDPattern(LED_SOLID);
+  Serial.println(F("PHASE 1: Ensure dryer is OFF"));
+  Serial.println(F("Starting in 5 seconds..."));
+}
+
+// Process learning phase
+void processLearningPhase() {
+  uint32_t now = millis();
+
+  // Check if we're in learning mode
+  if (g_learningPhase != LEARN_NONE) {
+    // Update LED pattern
+    updateLEDPattern();
+
+    // Auto-start measurement after prep time
+    if (g_learningStartMs == 0) {
+      // We're in prep phase - check if it's time to start measuring
+      if (now - g_learningPhaseEntryMs >= LEARNING_PREP_MS) {
+        // Start measurement!
+        g_learningStartMs = now;
+        setLEDPattern(LED_FAST_FLASH);
+        Serial.println(F("Measuring..."));
+      }
+    }
+
+    // Check if measurement period started
+    if (g_learningStartMs > 0) {
+      if (now - g_learningStartMs >= LEARNING_MEASURE_MS) {
+        // Measurement complete, show success blink
+        setLEDPattern(LED_SUCCESS_BLINK);
+        delay(700);  // Wait for success blink
+
+        // Move to next phase
+        switch (g_learningPhase) {
+          case LEARN_BASELINE:
+            Serial.print(F("Baseline learned: "));
+            Serial.print(g_learnedBaseline, 4);
+            Serial.println(F("A\n"));
+
+            g_learningPhase = LEARN_HEATER;
+            g_learningStartMs = 0;
+            g_learningPhaseEntryMs = now;  // Start prep timer for next phase
+            setLEDPattern(LED_BREATHING);
+            Serial.println(F("PHASE 2: Turn dryer ON (heater+fan)"));
+            Serial.println(F("You have 5 seconds..."));
+            break;
+
+          case LEARN_HEATER:
+            Serial.print(F("Heater+Fan learned: "));
+            Serial.print(g_learnedHeater, 4);
+            Serial.println(F("A\n"));
+
+            g_learningPhase = LEARN_FAN_ONLY;
+            g_learningStartMs = 0;
+            g_learningPhaseEntryMs = now;  // Start prep timer for next phase
+            setLEDPattern(LED_DOUBLE_BLINK);
+            Serial.println(F("PHASE 3: Turn heater OFF (keep fan running)"));
+            Serial.println(F("You have 5 seconds..."));
+            break;
+
+          case LEARN_FAN_ONLY:
+            Serial.print(F("Fan only learned: "));
+            Serial.print(g_learnedFanOnly, 4);
+            Serial.println(F("A\n"));
+
+            // Calculate optimal thresholds
+            Serial.println(F("Calculating thresholds..."));
+
+            // Fan threshold = halfway between baseline and fan-only
+            FAN_ON_THRESHOLD = (g_learnedBaseline + g_learnedFanOnly) / 2.0f + 0.002f;  // Add 2mA margin
+            FAN_OFF_THRESHOLD = FAN_ON_THRESHOLD - 0.005f;  // 5mA hysteresis
+
+            // Heater threshold = halfway between fan-only and heater
+            HEATER_ON_THRESHOLD = (g_learnedFanOnly + g_learnedHeater) / 2.0f;
+            HEATER_OFF_THRESHOLD = (g_learnedBaseline + g_learnedFanOnly) / 2.0f + 0.005f;
+
+            // Save to EEPROM
+            saveThresholdsToEEPROM();
+
+            // Show completion blink
+            g_learningPhase = LEARN_COMPLETE;
+            setLEDPattern(LED_COMPLETE_BLINK);
+            Serial.println(F("========================================"));
+            Serial.println(F("LEARNING COMPLETE!"));
+            Serial.println(F("Thresholds saved to EEPROM"));
+            Serial.println(F("========================================\n"));
+
+            delay(3500);  // Wait for complete blink
+
+            // Return to normal operation
+            g_learningPhase = LEARN_NONE;
+            setLEDPattern(LED_SOLID);
+            break;
+
+          default:
+            break;
+        }
+      } else {
+        // Still measuring - accumulate current reading
+        float Irms = measureIrmsOver(SAMPLE_MS);
+
+        switch (g_learningPhase) {
+          case LEARN_BASELINE:
+            // Running average
+            if (g_learnedBaseline == 0.0f) {
+              g_learnedBaseline = Irms;
+            } else {
+              g_learnedBaseline = g_learnedBaseline * 0.9f + Irms * 0.1f;
+            }
+            break;
+
+          case LEARN_HEATER:
+            // Take maximum reading (heater may cycle)
+            if (Irms > g_learnedHeater) {
+              g_learnedHeater = Irms;
+            }
+            break;
+
+          case LEARN_FAN_ONLY:
+            // Running average
+            if (g_learnedFanOnly == 0.0f) {
+              g_learnedFanOnly = Irms;
+            } else {
+              g_learnedFanOnly = g_learnedFanOnly * 0.9f + Irms * 0.1f;
+            }
+            break;
+
+          default:
+            break;
+        }
+
+        // Print progress every second
+        static uint32_t lastProgress = 0;
+        if (now - lastProgress >= 1000) {
+          uint32_t remaining = (LEARNING_MEASURE_MS - (now - g_learningStartMs)) / 1000;
+          Serial.print(F("  Measuring... "));
+          Serial.print(remaining);
+          Serial.print(F("s remaining ("));
+          Serial.print(Irms, 4);
+          Serial.println(F("A)"));
+          lastProgress = now;
+        }
+      }
+    }
+  }
+}
+
+// Handle learning mode button press
+void handleLearningButtonPress() {
+  if (g_learningPhase != LEARN_NONE && g_learningPhase != LEARN_COMPLETE) {
+    if (g_learningStartMs == 0) {
+      // Start measurement
+      Serial.println(F("Button pressed - starting measurement..."));
+      g_learningStartMs = millis();
+    }
+  }
 }
 
 // ----------------- Setup -----------------
@@ -588,6 +957,9 @@ void setup() {
   ads.setDataRate(RATE_ADS1115_128SPS);  // 128 samples per second
   Serial.println(F("ADS1115 initialized successfully\n"));
 
+  // Load learned thresholds from EEPROM (if available)
+  loadThresholdsFromEEPROM();
+
   // Run full calibration (servo + current offset)
   runFullCalibration();
 
@@ -598,29 +970,33 @@ void setup() {
   Serial.println(F("  R or r - Recalibrate servo only"));
   Serial.println(F("  F or f - Read current feedback (no movement)"));
   Serial.println(F("  S or s - Toggle standby mode"));
+  Serial.println(F("  L or l - Enter learning mode"));
   Serial.println(F("  0-180  - Move servo to specified degrees"));
   Serial.println(F("Button:"));
-  Serial.println(F("  Short press   - Full recalibration"));
-  Serial.println(F("  Long press 2s - Toggle standby/wake"));
+  Serial.println(F("  Short press       - Full recalibration"));
+  Serial.println(F("  Long press 2s     - Toggle standby/wake"));
+  Serial.println(F("  Very long press 5s - Enter learning mode"));
   Serial.println(F("========================================\n"));
 
   g_lastUpdateMs = millis();
+  setLEDPattern(LED_SOLID);
 }
 
 // ----------------- Loop -----------------
 void loop() {
+  static bool longPressExecuted = false;  // Declare at function scope
   uint32_t now = millis();
 
-  // Flash LED if not calibrated
-  if (!g_calibrated) {
-    if (now - g_lastLedToggle >= LED_FLASH_INTERVAL) {
-      g_ledState = !g_ledState;
-      digitalWrite(LED_PIN, g_ledState);
-      g_lastLedToggle = now;
-    }
+  // Handle learning mode first (if active)
+  if (g_learningPhase != LEARN_NONE) {
+    processLearningPhase();
+    return;  // Skip normal loop when in learning mode
   }
 
-  // Check for button press (short = recalibrate, long = toggle standby)
+  // Update LED pattern (handles all LED states now)
+  updateLEDPattern();
+
+  // Check for button press (short = recalibrate, long = toggle standby, very long = learning)
   bool currentButtonState = digitalRead(BUTTON_PIN);
 
   // Button just pressed - start timing
@@ -629,30 +1005,62 @@ void loop() {
     g_buttonHandled = false;
   }
 
-  // Button is being held - check for long press
-  if (currentButtonState == LOW && !g_buttonHandled) {
-    if (now - g_buttonPressStart >= LONG_PRESS_MS) {
-      g_buttonHandled = true;  // Prevent repeated triggers
+  // Button is being held - check for very long press first, then long press
+  if (currentButtonState == LOW) {
+    uint32_t pressDuration = now - g_buttonPressStart;
 
-      if (g_systemOn) {
-        // System is ON - enter standby mode
-        Serial.println(F("\n*** LONG PRESS DETECTED ***"));
-        enterStandbyMode();
-      } else {
-        // System is OFF - wake up with full calibration
-        Serial.println(F("\n*** LONG PRESS DETECTED ***"));
-        Serial.println(F("Waking up from standby..."));
-        runFullCalibration();
+    // Check for very long press (>5s) - takes priority, overrides long press
+    if (pressDuration >= VLONG_PRESS_MS) {
+      if (!g_buttonHandled) {
+        g_buttonHandled = true;  // Prevent repeated triggers
+        Serial.println(F("\n*** VERY LONG PRESS DETECTED ***"));
+
+        // Cancel standby if it was triggered
+        if (!g_systemOn) {
+          g_systemOn = true;
+          setLEDPattern(LED_FAST_FLASH);
+        }
+
+        startLearningMode();
+      }
+    }
+    // Check for long press (2s) - but only if very long press hasn't been handled yet
+    else if (pressDuration >= LONG_PRESS_MS && !g_buttonHandled) {
+      // Don't mark as handled yet - allow very long press to override
+      // Just execute the long press action once
+      if (!longPressExecuted) {
+        longPressExecuted = true;
+
+        if (g_systemOn) {
+          // System is ON - enter standby mode
+          Serial.println(F("\n*** LONG PRESS DETECTED ***"));
+          enterStandbyMode();
+        } else {
+          // System is OFF - wake up with full calibration
+          Serial.println(F("\n*** LONG PRESS DETECTED ***"));
+          Serial.println(F("Waking up from standby..."));
+          runFullCalibration();
+        }
       }
     }
   }
 
+  // Reset long press executed flag when button is released
+  if (currentButtonState == HIGH && g_lastButtonState == LOW) {
+    longPressExecuted = false;
+  }
+
   // Button just released - check for short press
   if (currentButtonState == HIGH && g_lastButtonState == LOW && !g_buttonHandled) {
-    // Short press detected (released before long press threshold)
-    Serial.println(F("\n*** SHORT PRESS DETECTED ***"));
-    Serial.println(F("Running recalibration..."));
-    runFullCalibration();
+    // Check if we're in learning mode waiting for button press
+    if (g_learningPhase != LEARN_NONE) {
+      handleLearningButtonPress();
+    } else {
+      // Short press detected (released before long press threshold)
+      Serial.println(F("\n*** SHORT PRESS DETECTED ***"));
+      Serial.println(F("Running recalibration..."));
+      runFullCalibration();
+    }
   }
 
   g_lastButtonState = currentButtonState;
@@ -719,6 +1127,9 @@ void loop() {
           Serial.println(F("\nWaking up from standby..."));
           runFullCalibration();
         }
+      } else if (ch == 'L' || ch == 'l') {
+        // Enter learning mode
+        startLearningMode();
       }
     }
     // Buffer digits for numeric input
