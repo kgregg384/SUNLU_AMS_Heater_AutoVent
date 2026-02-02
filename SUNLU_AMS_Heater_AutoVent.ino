@@ -117,6 +117,7 @@ static const uint32_t LED_FLASH_INTERVAL = 250;  // Flash every 250ms during cal
 bool g_lastButtonState = HIGH;
 uint32_t g_buttonPressStart = 0;
 bool g_buttonHandled = false;
+bool g_ignoreNextRelease = false;  // Flag to ignore button release after entering learning mode
 static const uint32_t LONG_PRESS_MS = 2000;   // 2 second long press
 static const uint32_t VLONG_PRESS_MS = 5000;  // 5 second very long press for learning mode
 
@@ -971,16 +972,7 @@ void loop() {
   static bool longPressExecuted = false;  // Declare at function scope
   uint32_t now = millis();
 
-  // Handle learning mode first (if active)
-  if (g_learningPhase != LEARN_NONE) {
-    processLearningPhase();
-    return;  // Skip normal loop when in learning mode
-  }
-
-  // Update LED pattern (handles all LED states now)
-  updateLEDPattern();
-
-  // Check for button press (short = recalibrate, long = toggle standby, very long = learning)
+  // Check for button press FIRST (before learning mode processing)
   bool currentButtonState = digitalRead(BUTTON_PIN);
 
   // Button just pressed - start timing
@@ -1007,6 +999,7 @@ void loop() {
         }
 
         startLearningMode();
+        g_ignoreNextRelease = true;  // Ignore the button release after entering learning mode
       }
     }
     // Check for long press (2s) - but only if very long press hasn't been handled yet
@@ -1036,11 +1029,18 @@ void loop() {
   }
 
   // Button just released - check for short press
-  if (currentButtonState == HIGH && g_lastButtonState == LOW && !g_buttonHandled) {
+  if (currentButtonState == HIGH && g_lastButtonState == LOW) {
     // Check if we're in learning mode waiting for button press
     if (g_learningPhase != LEARN_NONE) {
-      handleLearningButtonPress();
-    } else {
+      // Ignore the first button release after entering learning mode
+      if (g_ignoreNextRelease) {
+        Serial.println(F("Ignoring button release from learning mode entry"));
+        g_ignoreNextRelease = false;
+      } else {
+        Serial.println(F("Button released during learning mode"));
+        handleLearningButtonPress();
+      }
+    } else if (!g_buttonHandled) {
       // Short press detected (released before long press threshold)
       Serial.println(F("\n*** SHORT PRESS DETECTED ***"));
       Serial.println(F("Running recalibration..."));
@@ -1049,6 +1049,15 @@ void loop() {
   }
 
   g_lastButtonState = currentButtonState;
+
+  // Handle learning mode processing (if active)
+  if (g_learningPhase != LEARN_NONE) {
+    processLearningPhase();
+    return;  // Skip normal operation when in learning mode
+  }
+
+  // Update LED pattern (handles all LED states now)
+  updateLEDPattern();
 
   // Check for serial commands
   while (Serial.available()) {
