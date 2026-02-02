@@ -110,12 +110,9 @@ The status LED tells you what the controller is doing:
 
 | LED Pattern | Meaning | What to Do |
 |-------------|---------|-----------|
-| **SOLID ON** | Phase 1 Prep | Make sure dryer is OFF, wait 5 seconds |
-| **FAST FLASH** | Measuring | Hold still, measurement in progress (10 seconds) |
-| **2 QUICK FLASHES** | Phase Complete | Success! Moving to next phase |
-| **BREATHING** (slow pulse) | Phase 2 Prep | Turn dryer ON (heater + fan), wait 5 seconds |
-| **DOUBLE BLINK** (2 flashes, pause, repeat) | Phase 3 Prep | Turn heater OFF (fan keeps running), wait 5 seconds |
-| **2 QUICK FLASHES** then **SOLID** | Learning Complete | All done! Settings saved, back to normal |
+| **SOLID ON** | Ready and Waiting | Make dryer change, then press button when ready |
+| **FAST FLASH** | Measuring | Don't touch! Measurement in progress (10 seconds) |
+| **3 LONG BLINKS** | Learning Complete | All done! Settings saved, back to normal |
 
 ### Calibration
 
@@ -200,65 +197,58 @@ Learning Mode teaches the controller to recognize your specific dryer's electric
 
 #### Step-by-Step Instructions
 
-**PHASE 1: Baseline Measurement** (15 seconds)
+**PHASE 1: Baseline Measurement**
 
-1. Press and hold the button for 6-7 seconds
+1. **Start Learning Mode**
+   - Press and hold button for 6-7 seconds
    - LED turns off at 2 seconds → **Keep holding!**
    - LED turns back on at 5 seconds → Release button
+   - Learning mode begins
 
-2. **LED: SOLID**
-   - System is preparing
-   - **Ensure dryer is completely OFF**
-   - Wait 5 seconds
+2. **LED: SOLID** → Waiting for you
+   - **Ensure dryer is completely OFF** (heater and fan)
+   - When ready, **press button once**
 
-3. **LED: FAST FLASH**
-   - System is measuring baseline
+3. **LED: FAST FLASH** → Measuring baseline
+   - System is measuring (10 seconds)
    - **Do not touch anything**
-   - Wait 10 seconds
-
-4. **LED: 2 QUICK FLASHES**
-   - Phase 1 complete!
+   - LED will automatically go solid when done
 
 ---
 
-**PHASE 2: Heater + Fan Measurement** (15 seconds)
+**PHASE 2: Heater + Fan Measurement**
 
-5. **LED: BREATHING** (slow pulsing)
-   - System is ready for Phase 2
+4. **LED: SOLID** → Waiting for you
    - **Turn your dryer ON** (heater + fan both running)
-   - You have 5 seconds to do this
+   - When dryer is running, **press button once**
 
-6. **LED: FAST FLASH**
-   - System is measuring heater + fan
-   - **Leave dryer running, don't touch anything**
-   - Wait 10 seconds
-
-7. **LED: 2 QUICK FLASHES**
-   - Phase 2 complete!
+5. **LED: FAST FLASH** → Measuring heater + fan
+   - System is measuring (10 seconds)
+   - **Leave dryer running, don't touch**
+   - LED will automatically go solid when done
 
 ---
 
-**PHASE 3: Fan-Only Measurement** (15 seconds)
+**PHASE 3: Fan-Only Measurement**
 
-8. **LED: DOUBLE BLINK** (2 flashes, pause, repeat)
-   - System is ready for Phase 3
-   - **Turn heater OFF, but leave fan running**
-   - On most dryers: press the heat button twice quickly
-   - You have 5 seconds to do this
+6. **LED: SOLID** → Waiting for you
+   - **Turn heater OFF** (keep fan running)
+   - On most dryers: press heat button twice quickly
+   - When fan is running alone, **press button once**
 
-9. **LED: FAST FLASH**
-   - System is measuring fan only
-   - **Leave fan running, don't touch anything**
-   - Wait 10 seconds
+7. **LED: FAST FLASH** → Measuring fan only
+   - System is measuring (10 seconds)
+   - **Leave fan running, don't touch**
+   - Wait for completion
 
-10. **LED: 2 QUICK FLASHES**
-    - Phase 3 complete!
-    - Settings automatically saved to memory
+---
 
-11. **LED: SOLID**
-    - Back to normal operation
-    - Learning complete!
-    - You can now use your dryer normally
+**COMPLETE!**
+
+8. **LED: 3 LONG BLINKS** → All done!
+   - Settings automatically saved to memory
+   - System returns to normal operation
+   - You can now use your dryer normally
 
 ---
 
@@ -580,19 +570,18 @@ Check the GitHub repository for:
 
 | Pattern | Common Meaning |
 |---------|----------------|
-| Solid | Normal operation |
+| Solid | Normal operation OR waiting for button press (learning) |
 | Off | Standby mode |
 | Slow flash | Calibrating |
 | Fast flash | Measuring (learning) |
-| Breathing | Turn dryer ON |
-| Double blink | Turn heater OFF |
-| 2 quick flashes | Phase complete / Learning complete! |
+| 3 long blinks | Learning complete! |
 
 ### Learning Mode Quick Steps
 
-1. **Dryer OFF** → Hold button 6s → **SOLID** (5s) → **FAST FLASH** (10s) → **2 FLASHES**
-2. **Turn dryer ON** → **BREATHING** (5s) → **FAST FLASH** (10s) → **2 FLASHES**
-3. **Turn heater OFF** → **DOUBLE BLINK** (5s) → **FAST FLASH** (10s) → **2 FLASHES** → **SOLID** → Done!
+1. **Dryer OFF** → Hold button 6s → **SOLID** (press button) → **FAST FLASH** (10s)
+2. **Turn dryer ON** → **SOLID** (press button) → **FAST FLASH** (10s)
+3. **Turn heater OFF** (fan only) → **SOLID** (press button) → **FAST FLASH** (10s)
+4. **3 LONG BLINKS** → Done!
 
 ---
 

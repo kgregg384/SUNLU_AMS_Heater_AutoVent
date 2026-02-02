@@ -749,13 +749,14 @@ void startLearningMode() {
   Serial.println(F("ENTERING LEARNING MODE"));
   Serial.println(F("========================================"));
   Serial.println(F("This will learn optimal thresholds"));
-  Serial.println(F("Follow LED patterns:"));
-  Serial.println(F("  SOLID = Get ready"));
-  Serial.println(F("  FAST FLASH = Measuring now"));
-  Serial.println(F("  SUCCESS BLINK = Phase complete"));
-  Serial.println(F("  BREATHING = Turn dryer ON (heater+fan)"));
-  Serial.println(F("  DOUBLE BLINK = Turn heater OFF (fan only)"));
-  Serial.println(F("  COMPLETE BLINK = All done!"));
+  Serial.println(F(""));
+  Serial.println(F("LED patterns:"));
+  Serial.println(F("  FLASHING = Measuring now (don't touch)"));
+  Serial.println(F("  SOLID = Waiting - make change, press button"));
+  Serial.println(F("  3 LONG BLINKS = All done!"));
+  Serial.println(F(""));
+  Serial.println(F("PHASE 1: Ensure dryer is completely OFF"));
+  Serial.println(F("Press button when ready..."));
   Serial.println(F("========================================\n"));
 
   g_learningPhase = LEARN_BASELINE;
@@ -763,12 +764,10 @@ void startLearningMode() {
   g_learnedHeater = 0.0f;
   g_learnedFanOnly = 0.0f;
   g_learningStartMs = 0;  // Not measuring yet
-  g_learningPhaseEntryMs = millis();  // Mark when we entered this phase
+  g_learningPhaseEntryMs = millis();
 
-  // Start with solid LED - user has 5 seconds to prepare
+  // Start with solid LED - waiting for user to press button
   setLEDPattern(LED_SOLID);
-  Serial.println(F("PHASE 1: Ensure dryer is OFF"));
-  Serial.println(F("Starting in 5 seconds..."));
 }
 
 // Process learning phase
@@ -780,23 +779,11 @@ void processLearningPhase() {
     // Update LED pattern
     updateLEDPattern();
 
-    // Auto-start measurement after prep time
-    if (g_learningStartMs == 0) {
-      // We're in prep phase - check if it's time to start measuring
-      if (now - g_learningPhaseEntryMs >= LEARNING_PREP_MS) {
-        // Start measurement!
-        g_learningStartMs = now;
-        setLEDPattern(LED_FAST_FLASH);
-        Serial.println(F("Measuring..."));
-      }
-    }
-
     // Check if measurement period started
     if (g_learningStartMs > 0) {
       if (now - g_learningStartMs >= LEARNING_MEASURE_MS) {
-        // Measurement complete, show success blink
-        setLEDPattern(LED_SUCCESS_BLINK);
-        delay(700);  // Wait for success blink
+        // Measurement complete - stop measuring and wait for user
+        g_learningStartMs = 0;
 
         // Move to next phase
         switch (g_learningPhase) {
@@ -806,11 +793,9 @@ void processLearningPhase() {
             Serial.println(F("A\n"));
 
             g_learningPhase = LEARN_HEATER;
-            g_learningStartMs = 0;
-            g_learningPhaseEntryMs = now;  // Start prep timer for next phase
-            setLEDPattern(LED_BREATHING);
-            Serial.println(F("PHASE 2: Turn dryer ON (heater+fan)"));
-            Serial.println(F("You have 5 seconds..."));
+            setLEDPattern(LED_SOLID);
+            Serial.println(F("PHASE 2: Turn dryer ON (heater + fan)"));
+            Serial.println(F("Press button when ready..."));
             break;
 
           case LEARN_HEATER:
@@ -819,11 +804,9 @@ void processLearningPhase() {
             Serial.println(F("A\n"));
 
             g_learningPhase = LEARN_FAN_ONLY;
-            g_learningStartMs = 0;
-            g_learningPhaseEntryMs = now;  // Start prep timer for next phase
-            setLEDPattern(LED_DOUBLE_BLINK);
-            Serial.println(F("PHASE 3: Turn heater OFF (keep fan running)"));
-            Serial.println(F("You have 5 seconds..."));
+            setLEDPattern(LED_SOLID);
+            Serial.println(F("PHASE 3: Turn heater OFF (fan only)"));
+            Serial.println(F("Press button when ready..."));
             break;
 
           case LEARN_FAN_ONLY:
@@ -917,9 +900,10 @@ void processLearningPhase() {
 void handleLearningButtonPress() {
   if (g_learningPhase != LEARN_NONE && g_learningPhase != LEARN_COMPLETE) {
     if (g_learningStartMs == 0) {
-      // Start measurement
-      Serial.println(F("Button pressed - starting measurement..."));
+      // Start measurement - switch to flashing LED
+      Serial.println(F("Starting measurement..."));
       g_learningStartMs = millis();
+      setLEDPattern(LED_FAST_FLASH);
     }
   }
 }
