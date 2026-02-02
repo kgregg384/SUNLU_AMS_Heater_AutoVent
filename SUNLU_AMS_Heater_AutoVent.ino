@@ -990,7 +990,8 @@ void loop() {
   }
 
   // Button is being held - check for very long press first, then long press
-  if (currentButtonState == LOW) {
+  // Skip long/very long press detection if already in learning mode
+  if (currentButtonState == LOW && g_learningPhase == LEARN_NONE) {
     uint32_t pressDuration = now - g_buttonPressStart;
 
     // Check for very long press (>5s) - takes priority, overrides long press
