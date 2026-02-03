@@ -33,7 +33,7 @@ The system works by monitoring the electrical current drawn by your dryer and le
 
 **You Will Need to Provide:**
 - 3D printed parts (STL files available in repository)
-- Seeed XIAO SAMD21 microcontroller
+- Seeed XIAO SAMD21 **OR** Seeed XIAO RP2040 microcontroller (code supports both!)
 - ADS1115 ADC module
 - ACS758 LCB-050B current sensor
 - Feedback-enabled servo motor
