@@ -14,15 +14,16 @@
  * - Button-based user interface
  * - 3-minute fan cooldown delay
  *
- * Hardware:
+ * Supported Hardware:
  * - Board: Seeed XIAO SAMD21 (3.3V, 48MHz ARM Cortex-M0+)
+ * - Board: Seeed XIAO RP2040 (3.3V, 133MHz dual-core ARM Cortex-M0+)
  * - Current Sensor: ACS758 LCB-050B (AC current, 40mV/A sensitivity)
  * - ADC: ADS1115 16-bit I2C ADC (±4.096V range)
  * - Servo: Feedback-enabled servo motor
  * - LED: Status indicator (active low)
  * - Button: Momentary push button (active low, internal pullup)
  *
- * Pin Configuration:
+ * Pin Configuration (same for both XIAO boards):
  * - Pin 0 (D0): Servo PWM output
  * - Pin 3 (D3): Button input (active low, internal pullup)
  * - Pin 10 (D10): Status LED (active low)
@@ -34,14 +35,33 @@
  *
  * Author: Generated with Claude Code
  * License: MIT
- * Version: 1.0
+ * Version: 1.1
  */
-  
+
+// ----------------- Board Detection -----------------
+#if defined(ARDUINO_ARCH_SAMD)
+  #define BOARD_SAMD21
+  #define XIAO_BOARD_NAME "SAMD21"
+#elif defined(ARDUINO_ARCH_RP2040)
+  #define BOARD_RP2040
+  #define XIAO_BOARD_NAME "RP2040"
+#else
+  #error "Unsupported board! This code requires Seeed XIAO SAMD21 or XIAO RP2040"
+#endif
+
+// ----------------- Includes -----------------
 #include <Wire.h>
 #include <Adafruit_ADS1X15.h>
 #include <Servo.h>
 #include <math.h>
-#include <FlashStorage.h>  // SAMD21 EEPROM emulation
+
+// Board-specific EEPROM libraries
+#ifdef BOARD_SAMD21
+  #include <FlashStorage.h>  // SAMD21 EEPROM emulation
+#endif
+#ifdef BOARD_RP2040
+  #include <EEPROM.h>  // RP2040 EEPROM emulation
+#endif
 
 // ----------------- Constants -----------------
 #define ADS_CH_CURRENT   0   // ACS758 -> ADS A0
@@ -164,7 +184,15 @@ struct ThresholdData {
   float heaterOffThreshold;
 };
 static const uint32_t EEPROM_MAGIC = 0xABCD1234;
-FlashStorage(thresholdStorage, ThresholdData);
+
+// Board-specific storage implementation
+#ifdef BOARD_SAMD21
+  FlashStorage(thresholdStorage, ThresholdData);
+#endif
+#ifdef BOARD_RP2040
+  #define EEPROM_SIZE 512  // RP2040 EEPROM size
+  #define EEPROM_ADDR 0    // Start address for our data
+#endif
 
 // ----------------- Helper Functions -----------------
 
@@ -704,7 +732,15 @@ void enterStandbyMode() {
 
 // Load thresholds from EEPROM
 bool loadThresholdsFromEEPROM() {
-  ThresholdData data = thresholdStorage.read();
+  ThresholdData data;
+
+  // Board-specific read implementation
+  #ifdef BOARD_SAMD21
+    data = thresholdStorage.read();
+  #endif
+  #ifdef BOARD_RP2040
+    EEPROM.get(EEPROM_ADDR, data);
+  #endif
 
   if (data.magic == EEPROM_MAGIC) {
     FAN_ON_THRESHOLD = data.fanOnThreshold;
@@ -734,7 +770,14 @@ void saveThresholdsToEEPROM() {
   data.heaterOnThreshold = HEATER_ON_THRESHOLD;
   data.heaterOffThreshold = HEATER_OFF_THRESHOLD;
 
-  thresholdStorage.write(data);
+  // Board-specific write implementation
+  #ifdef BOARD_SAMD21
+    thresholdStorage.write(data);
+  #endif
+  #ifdef BOARD_RP2040
+    EEPROM.put(EEPROM_ADDR, data);
+    EEPROM.commit();  // RP2040 requires commit to write to flash
+  #endif
 
   Serial.println(F("\n=== Saved thresholds to EEPROM ==="));
   Serial.print(F("  Fan ON:  ")); Serial.print(FAN_ON_THRESHOLD, 4); Serial.println(F("A"));
@@ -925,9 +968,16 @@ void setup() {
   while (!Serial && (millis() - serialTimeout < 3000)) { }
 
   Serial.println(F("\n\n========================================"));
-  Serial.println(F("ACS758 Current Sensor Debug - Enhanced"));
-  Serial.println(F("Seeed XIAO SAMD21 + ADS1115 + Servo"));
+  Serial.println(F("SUNLU AMS Heater Auto-Vent Controller"));
+  Serial.print(F("Board: Seeed XIAO "));
+  Serial.println(XIAO_BOARD_NAME);
   Serial.println(F("========================================\n"));
+
+  // Initialize EEPROM for RP2040
+  #ifdef BOARD_RP2040
+    EEPROM.begin(EEPROM_SIZE);
+    Serial.println(F("RP2040 EEPROM initialized"));
+  #endif
 
   Serial.println(F("Initializing ADS1115..."));
   if (!ads.begin()) {

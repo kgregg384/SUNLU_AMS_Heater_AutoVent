@@ -18,12 +18,25 @@ The SUNLU AMS Heater Auto-Vent Controller is an intelligent automation system de
 
 ### 2.1 Microcontroller
 
-- **Model**: Seeed XIAO SAMD21
-- **Processor**: ARM Cortex-M0+ @ 48MHz
+**Supported Models** (code automatically detects board type):
+
+**Option 1: Seeed XIAO SAMD21**
+- **Processor**: ARM Cortex-M0+ @ 48MHz (single core)
 - **Operating Voltage**: 3.3V
 - **Flash Memory**: 256KB
 - **SRAM**: 32KB
 - **I/O Voltage**: 3.3V logic levels
+- **EEPROM**: FlashStorage emulation
+
+**Option 2: Seeed XIAO RP2040**
+- **Processor**: Dual ARM Cortex-M0+ @ 133MHz (dual core)
+- **Operating Voltage**: 3.3V
+- **Flash Memory**: 2MB
+- **SRAM**: 264KB
+- **I/O Voltage**: 3.3V logic levels
+- **EEPROM**: EEPROM library emulation
+
+**Note**: Both boards use identical pinouts, so hardware connections remain the same regardless of which microcontroller you choose.
 
 ### 2.2 Current Sensor
 
@@ -205,7 +218,9 @@ struct ThresholdData {
 };
 ```
 
-Storage uses SAMD21 FlashStorage library for EEPROM emulation.
+**Storage Implementation** (automatically selected based on board):
+- **SAMD21**: Uses FlashStorage library for EEPROM emulation
+- **RP2040**: Uses EEPROM.h library with 512-byte EEPROM emulation
 
 ### 4.7 LED Patterns
 
