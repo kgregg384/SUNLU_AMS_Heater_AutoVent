@@ -15,17 +15,19 @@
  * - 3-minute fan cooldown delay
  *
  * Hardware:
- * - Board: Seeed XIAO SAMD21 (3.3V, 48MHz ARM Cortex-M0+)
+ * - Board: Seeed XIAO SAMD21 OR Seeed XIAO RP2040 (auto-detected)
+ *   - SAMD21: 3.3V, 48MHz ARM Cortex-M0+, 256KB Flash, 32KB SRAM
+ *   - RP2040: 3.3V, 133MHz Dual ARM Cortex-M0+, 2MB Flash, 264KB SRAM
  * - Current Sensor: ACS758 LCB-050B (AC current, 40mV/A sensitivity)
  * - ADC: ADS1115 16-bit I2C ADC (±4.096V range)
  * - Servo: Feedback-enabled servo motor
  * - LED: Status indicator (active low)
  * - Button: Momentary push button (active low, internal pullup)
  *
- * Pin Configuration:
- * - Pin 0 (D0): Servo PWM output
- * - Pin 3 (D3): Button input (active low, internal pullup)
- * - Pin 10 (D10): Status LED (active low)
+ * Pin Configuration (identical physical pins on both boards):
+ * - D0: Servo PWM output
+ * - D3: Button input (active low, internal pullup)
+ * - D10: Status LED (active low)
  * - SDA/SCL: I2C bus for ADS1115
  *
  * ADS1115 Channel Mapping:
@@ -34,21 +36,49 @@
  *
  * Author: Generated with Claude Code
  * License: MIT
- * Version: 1.0
+ * Version: 1.1 (Added RP2040 support)
  */
-  
+
+// Board detection and conditional compilation
+#if defined(ARDUINO_ARCH_SAMD)
+  #define BOARD_SAMD21
+  #include <FlashStorage.h>  // SAMD21 EEPROM emulation
+  #define MY_BOARD_NAME "SAMD21"
+#elif defined(ARDUINO_ARCH_RP2040)
+  #define BOARD_RP2040
+  #include <EEPROM.h>  // RP2040 EEPROM emulation
+  #include <hardware/gpio.h>
+  #include <hardware/pwm.h>
+  #define MY_BOARD_NAME "RP2040"
+#else
+  #error "Unsupported board! This code requires Seeed XIAO SAMD21 or RP2040"
+#endif
+
 #include <Wire.h>
 #include <Adafruit_ADS1X15.h>
 #include <Servo.h>
 #include <math.h>
-#include <FlashStorage.h>  // SAMD21 EEPROM emulation
+
+// ----------------- Pin Definitions -----------------
+// RP2040 requires D prefix, SAMD21 uses numeric pins
+// Both boards have identical physical pinout on XIAO form factor
+#ifdef BOARD_RP2040
+  #define SERVO_PWM_PIN    D0   // Servo PWM output (GPIO26)
+  #define LED_PIN          D10  // Status LED (GPIO3)
+  #define BUTTON_PIN       D3   // Button input (GPIO29)
+  // GPIO numbers for RP2040 hardware control
+  #define GPIO_SERVO       26   // D0 = GPIO26
+  #define GPIO_LED         3    // D10 = GPIO3
+  #define GPIO_BTN         29   // D3 = GPIO29
+#else  // SAMD21
+  #define SERVO_PWM_PIN    0    // Servo PWM output
+  #define LED_PIN          10   // Status LED
+  #define BUTTON_PIN       3    // Button input
+#endif
 
 // ----------------- Constants -----------------
 #define ADS_CH_CURRENT   0   // ACS758 -> ADS A0
 #define ADS_CH_SERVO_FB  1   // Servo feedback -> ADS A1
-#define SERVO_PWM_PIN    0   // Servo PWM output
-#define LED_PIN         10   // Status LED (connected to ground)
-#define BUTTON_PIN       3   // Calibration button (momentary, active LOW)
 
 static const float ADS_LSB_V     = 0.000125f;   // ADS1115 @ GAIN_ONE (±4.096V range)
 static const float SENS_V_PER_A  = 0.040f;      // ACS758 LCB-050B @ 5V ≈ 40 mV/A
@@ -164,7 +194,10 @@ struct ThresholdData {
   float heaterOffThreshold;
 };
 static const uint32_t EEPROM_MAGIC = 0xABCD1234;
-FlashStorage(thresholdStorage, ThresholdData);
+
+#ifdef BOARD_SAMD21
+  FlashStorage(thresholdStorage, ThresholdData);
+#endif
 
 // ----------------- Helper Functions -----------------
 
@@ -704,7 +737,14 @@ void enterStandbyMode() {
 
 // Load thresholds from EEPROM
 bool loadThresholdsFromEEPROM() {
-  ThresholdData data = thresholdStorage.read();
+  ThresholdData data;
+
+  #ifdef BOARD_SAMD21
+    data = thresholdStorage.read();
+  #else  // RP2040
+    EEPROM.begin(512);  // Initialize EEPROM with 512 bytes
+    EEPROM.get(0, data);
+  #endif
 
   if (data.magic == EEPROM_MAGIC) {
     FAN_ON_THRESHOLD = data.fanOnThreshold;
@@ -734,7 +774,12 @@ void saveThresholdsToEEPROM() {
   data.heaterOnThreshold = HEATER_ON_THRESHOLD;
   data.heaterOffThreshold = HEATER_OFF_THRESHOLD;
 
-  thresholdStorage.write(data);
+  #ifdef BOARD_SAMD21
+    thresholdStorage.write(data);
+  #else  // RP2040
+    EEPROM.put(0, data);
+    EEPROM.commit();  // RP2040 requires explicit commit
+  #endif
 
   Serial.println(F("\n=== Saved thresholds to EEPROM ==="));
   Serial.print(F("  Fan ON:  ")); Serial.print(FAN_ON_THRESHOLD, 4); Serial.println(F("A"));
@@ -912,6 +957,20 @@ void handleLearningButtonPress() {
 // ----------------- Setup -----------------
 void setup() {
   // Initialize LED and button pins first
+  #ifdef BOARD_RP2040
+    // CRITICAL: RP2040 requires explicit GPIO function setup
+    // GPIO3 (D10) defaults to SPI MOSI, must set to GPIO mode
+    // GPIO26 (D0) needs PWM function for servo
+    // GPIO29 (D3) needs GPIO mode for button
+    gpio_set_function(GPIO_LED, GPIO_FUNC_SIO);    // D10/GPIO3 to GPIO mode
+    gpio_set_function(GPIO_SERVO, GPIO_FUNC_PWM);  // D0/GPIO26 to PWM mode
+    gpio_set_function(GPIO_BTN, GPIO_FUNC_SIO);    // D3/GPIO29 to GPIO mode
+
+    // Set maximum drive strength for LED (makes it brighter)
+    gpio_set_drive_strength(GPIO_LED, GPIO_DRIVE_STRENGTH_12MA);
+    gpio_set_slew_rate(GPIO_LED, GPIO_SLEW_RATE_FAST);
+  #endif
+
   pinMode(LED_PIN, OUTPUT);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   pinMode(LED_BUILTIN, OUTPUT);
@@ -925,8 +984,10 @@ void setup() {
   while (!Serial && (millis() - serialTimeout < 3000)) { }
 
   Serial.println(F("\n\n========================================"));
-  Serial.println(F("ACS758 Current Sensor Debug - Enhanced"));
-  Serial.println(F("Seeed XIAO SAMD21 + ADS1115 + Servo"));
+  Serial.println(F("SUNLU AMS Heater Auto-Vent Controller"));
+  Serial.print(F("Board: Seeed XIAO "));
+  Serial.println(F(MY_BOARD_NAME));
+  Serial.println(F("ADS1115 + ACS758 + Servo"));
   Serial.println(F("========================================\n"));
 
   Serial.println(F("Initializing ADS1115..."));
