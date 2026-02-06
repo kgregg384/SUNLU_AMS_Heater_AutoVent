@@ -59,6 +59,10 @@
 #include <Servo.h>
 #include <math.h>
 
+#ifdef BOARD_RP2040
+  #include <Adafruit_NeoPixel.h>
+#endif
+
 // ----------------- Pin Definitions -----------------
 // RP2040 requires D prefix, SAMD21 uses numeric pins
 // Both boards have identical physical pinout on XIAO form factor
@@ -143,6 +147,18 @@ uint32_t g_lastLedToggle = 0;
 bool g_ledState = false;
 static const uint32_t LED_FLASH_INTERVAL = 250;  // Flash every 250ms during calibration
 
+// Built-in LED breathing effect (RP2040 only)
+#ifdef BOARD_RP2040
+  uint32_t g_breathingStartMs = 0;
+  static const uint32_t BREATHING_PERIOD_MS = 3000;  // 3 second breathing cycle
+  static const uint8_t BREATHING_MIN = 2;   // Minimum brightness (never fully off)
+  static const uint8_t BREATHING_MAX = 40;  // Maximum brightness (dimmer)
+  static const uint8_t NEOPIXEL_POWER_PIN = 11;  // NeoPixel power pin (must be HIGH)
+  static const uint8_t NEOPIXEL_DATA_PIN = 12;   // NeoPixel data pin (GPIO12 on XIAO RP2040)
+  static const uint8_t NEOPIXEL_COUNT = 1;       // One NeoPixel LED
+  Adafruit_NeoPixel neopixel(NEOPIXEL_COUNT, NEOPIXEL_DATA_PIN, NEO_GRB + NEO_KHZ800);
+#endif
+
 // Button state for edge detection and long press
 bool g_lastButtonState = HIGH;
 uint32_t g_buttonPressStart = 0;
@@ -201,6 +217,40 @@ static const uint32_t EEPROM_MAGIC = 0xABCD1234;
 
 // ----------------- Helper Functions -----------------
 
+#ifdef BOARD_RP2040
+// Update built-in NeoPixel with smooth breathing effect (RP2040 only)
+// Uses NeoPixel library for WS2812B RGB LED control
+// Color changes based on heater state: RED = heater on, BLUE = heater off
+void updateBuiltinLEDBreathing() {
+  uint32_t now = millis();
+  uint32_t elapsed = now - g_breathingStartMs;
+  uint32_t phase = elapsed % BREATHING_PERIOD_MS;
+
+  // Calculate brightness using sine wave approximation
+  // Phase goes from 0 to BREATHING_PERIOD_MS
+  float t = (float)phase / (float)BREATHING_PERIOD_MS;  // 0.0 to 1.0
+
+  // Use sine wave: sin(2*PI*t) ranges from -1 to 1
+  // Convert to 0 to 1: (sin(2*PI*t) + 1) / 2
+  float angle = t * 2.0f * 3.14159f;
+  float brightness = (sin(angle) + 1.0f) / 2.0f;
+
+  // Map to brightness range with minimum brightness
+  uint8_t brightnessValue = BREATHING_MIN + (uint8_t)(brightness * (BREATHING_MAX - BREATHING_MIN));
+
+  // Seeed XIAO RP2040: NeoPixel on pin 12 (data), pin 11 (power)
+  // Color based on heater state: RED = heater on, BLUE = heater off
+  if (g_heaterOn) {
+    // Red when heater is on
+    neopixel.setPixelColor(0, neopixel.Color(brightnessValue, 0, 0));
+  } else {
+    // Blue when heater is off
+    neopixel.setPixelColor(0, neopixel.Color(0, 0, brightnessValue));
+  }
+  neopixel.show();
+}
+#endif
+
 // LED pattern handler - call this frequently from loop()
 void updateLEDPattern() {
   uint32_t now = millis();
@@ -209,14 +259,18 @@ void updateLEDPattern() {
   switch (g_ledPattern) {
     case LED_SOLID:
       digitalWrite(LED_PIN, HIGH);
-      digitalWrite(LED_BUILTIN, HIGH);
+      #ifdef BOARD_SAMD21
+        digitalWrite(LED_BUILTIN, HIGH);
+      #endif
       break;
 
     case LED_FAST_FLASH:  // 100ms on/off for learning mode
       if (now - g_lastLedToggle >= 100) {
         g_ledState = !g_ledState;
         digitalWrite(LED_PIN, g_ledState);
-        digitalWrite(LED_BUILTIN, g_ledState);
+        #ifdef BOARD_SAMD21
+          digitalWrite(LED_BUILTIN, g_ledState);
+        #endif
         g_lastLedToggle = now;
       }
       break;
@@ -225,7 +279,9 @@ void updateLEDPattern() {
       if (now - g_lastLedToggle >= 250) {
         g_ledState = !g_ledState;
         digitalWrite(LED_PIN, g_ledState);
-        digitalWrite(LED_BUILTIN, g_ledState);
+        #ifdef BOARD_SAMD21
+          digitalWrite(LED_BUILTIN, g_ledState);
+        #endif
         g_lastLedToggle = now;
       }
       break;
@@ -233,16 +289,24 @@ void updateLEDPattern() {
     case LED_DOUBLE_BLINK:  // Double blink every 2 seconds
       if (elapsed < 150) {
         digitalWrite(LED_PIN, HIGH);
-        digitalWrite(LED_BUILTIN, HIGH);
+        #ifdef BOARD_SAMD21
+          digitalWrite(LED_BUILTIN, HIGH);
+        #endif
       } else if (elapsed < 300) {
         digitalWrite(LED_PIN, LOW);
-        digitalWrite(LED_BUILTIN, LOW);
+        #ifdef BOARD_SAMD21
+          digitalWrite(LED_BUILTIN, LOW);
+        #endif
       } else if (elapsed < 450) {
         digitalWrite(LED_PIN, HIGH);
-        digitalWrite(LED_BUILTIN, HIGH);
+        #ifdef BOARD_SAMD21
+          digitalWrite(LED_BUILTIN, HIGH);
+        #endif
       } else if (elapsed < 2000) {
         digitalWrite(LED_PIN, LOW);
-        digitalWrite(LED_BUILTIN, LOW);
+        #ifdef BOARD_SAMD21
+          digitalWrite(LED_BUILTIN, LOW);
+        #endif
       } else {
         g_ledPatternStart = now;
       }
@@ -255,12 +319,16 @@ void updateLEDPattern() {
         if (cycle < 1000) {
           // Fade in - use simple threshold
           digitalWrite(LED_PIN, cycle > 500 ? HIGH : (cycle % 100 < 50 ? HIGH : LOW));
-          digitalWrite(LED_BUILTIN, cycle > 500 ? HIGH : (cycle % 100 < 50 ? HIGH : LOW));
+          #ifdef BOARD_SAMD21
+            digitalWrite(LED_BUILTIN, cycle > 500 ? HIGH : (cycle % 100 < 50 ? HIGH : LOW));
+          #endif
         } else {
           // Fade out
           uint32_t fadeOut = cycle - 1000;
           digitalWrite(LED_PIN, fadeOut < 500 ? HIGH : (fadeOut % 100 < 50 ? HIGH : LOW));
-          digitalWrite(LED_BUILTIN, fadeOut < 500 ? HIGH : (fadeOut % 100 < 50 ? HIGH : LOW));
+          #ifdef BOARD_SAMD21
+            digitalWrite(LED_BUILTIN, fadeOut < 500 ? HIGH : (fadeOut % 100 < 50 ? HIGH : LOW));
+          #endif
         }
       }
       break;
@@ -268,16 +336,24 @@ void updateLEDPattern() {
     case LED_SUCCESS_BLINK:  // 2 quick flashes then return to solid
       if (elapsed < 150) {
         digitalWrite(LED_PIN, HIGH);
-        digitalWrite(LED_BUILTIN, HIGH);
+        #ifdef BOARD_SAMD21
+          digitalWrite(LED_BUILTIN, HIGH);
+        #endif
       } else if (elapsed < 300) {
         digitalWrite(LED_PIN, LOW);
-        digitalWrite(LED_BUILTIN, LOW);
+        #ifdef BOARD_SAMD21
+          digitalWrite(LED_BUILTIN, LOW);
+        #endif
       } else if (elapsed < 450) {
         digitalWrite(LED_PIN, HIGH);
-        digitalWrite(LED_BUILTIN, HIGH);
+        #ifdef BOARD_SAMD21
+          digitalWrite(LED_BUILTIN, HIGH);
+        #endif
       } else if (elapsed < 600) {
         digitalWrite(LED_PIN, LOW);
-        digitalWrite(LED_BUILTIN, LOW);
+        #ifdef BOARD_SAMD21
+          digitalWrite(LED_BUILTIN, LOW);
+        #endif
       } else {
         g_ledPattern = LED_SOLID;
       }
@@ -286,22 +362,34 @@ void updateLEDPattern() {
     case LED_COMPLETE_BLINK:  // 3 long flashes then return to solid
       if (elapsed < 500) {
         digitalWrite(LED_PIN, HIGH);
-        digitalWrite(LED_BUILTIN, HIGH);
+        #ifdef BOARD_SAMD21
+          digitalWrite(LED_BUILTIN, HIGH);
+        #endif
       } else if (elapsed < 1000) {
         digitalWrite(LED_PIN, LOW);
-        digitalWrite(LED_BUILTIN, LOW);
+        #ifdef BOARD_SAMD21
+          digitalWrite(LED_BUILTIN, LOW);
+        #endif
       } else if (elapsed < 1500) {
         digitalWrite(LED_PIN, HIGH);
-        digitalWrite(LED_BUILTIN, HIGH);
+        #ifdef BOARD_SAMD21
+          digitalWrite(LED_BUILTIN, HIGH);
+        #endif
       } else if (elapsed < 2000) {
         digitalWrite(LED_PIN, LOW);
-        digitalWrite(LED_BUILTIN, LOW);
+        #ifdef BOARD_SAMD21
+          digitalWrite(LED_BUILTIN, LOW);
+        #endif
       } else if (elapsed < 2500) {
         digitalWrite(LED_PIN, HIGH);
-        digitalWrite(LED_BUILTIN, HIGH);
+        #ifdef BOARD_SAMD21
+          digitalWrite(LED_BUILTIN, HIGH);
+        #endif
       } else if (elapsed < 3000) {
         digitalWrite(LED_PIN, LOW);
-        digitalWrite(LED_BUILTIN, LOW);
+        #ifdef BOARD_SAMD21
+          digitalWrite(LED_BUILTIN, LOW);
+        #endif
       } else {
         g_ledPattern = LED_SOLID;
       }
@@ -309,7 +397,9 @@ void updateLEDPattern() {
 
     case LED_OFF:
       digitalWrite(LED_PIN, LOW);
-      digitalWrite(LED_BUILTIN, LOW);
+      #ifdef BOARD_SAMD21
+        digitalWrite(LED_BUILTIN, LOW);
+      #endif
       break;
   }
 }
@@ -975,7 +1065,18 @@ void setup() {
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);  // LED off initially
-  digitalWrite(LED_BUILTIN, LOW);  // LED off Initially
+
+  #ifdef BOARD_RP2040
+    // Initialize NeoPixel power and breathing effect
+    pinMode(NEOPIXEL_POWER_PIN, OUTPUT);
+    digitalWrite(NEOPIXEL_POWER_PIN, HIGH);  // Power on the NeoPixel
+    neopixel.begin();
+    neopixel.setBrightness(255);  // Full brightness control in code
+    neopixel.show(); // Initialize all pixels to 'off'
+    g_breathingStartMs = millis();
+  #else
+    digitalWrite(LED_BUILTIN, LOW);  // LED off Initially (SAMD21)
+  #endif
 
   Serial.begin(115200);
 
@@ -1119,6 +1220,16 @@ void loop() {
 
   // Update LED pattern (handles all LED states now)
   updateLEDPattern();
+
+  // Update built-in LED breathing effect (RP2040 only)
+  #ifdef BOARD_RP2040
+    if (g_systemOn) {  // Only breathe when system is active
+      updateBuiltinLEDBreathing();
+    } else {
+      neopixel.setPixelColor(0, 0);  // Turn off in standby
+      neopixel.show();
+    }
+  #endif
 
   // Check for serial commands
   while (Serial.available()) {
