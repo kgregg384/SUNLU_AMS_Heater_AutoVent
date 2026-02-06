@@ -1063,7 +1063,9 @@ void setup() {
 
   pinMode(LED_PIN, OUTPUT);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
-  pinMode(LED_BUILTIN, OUTPUT);
+  #ifdef BOARD_SAMD21
+    pinMode(LED_BUILTIN, OUTPUT);
+  #endif
   digitalWrite(LED_PIN, LOW);  // LED off initially
 
   #ifdef BOARD_RP2040
