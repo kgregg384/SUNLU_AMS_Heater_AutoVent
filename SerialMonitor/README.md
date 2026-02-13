@@ -92,8 +92,12 @@ Use the quick command buttons to send common commands without typing:
 
 - **Learn Mode** (L): Start learning mode to calibrate thresholds
   - Initiates 3-phase learning process
-  - Follow on-screen prompts from Arduino
-  - No need to press button on device!
+  - Completely remote - no physical button needed!
+
+- **Next Phase** (N): Advance to next learning phase
+  - Click after each learning stage completes
+  - Workflow: `Learn Mode` → wait → `Next Phase` → wait → `Next Phase` → wait → `Next Phase` → Done!
+  - Replaces physical button press
 
 - **Open Vent** (O): Manually open the vent
 
@@ -116,7 +120,46 @@ For advanced commands:
 **Examples:**
 - Type `90` to move servo to 90 degrees
 - Type `L` to start learning mode
+- Type `N` to advance learning phase
 - Any single character or number supported by Arduino firmware
+
+### Running Learning Mode Remotely
+
+You can complete the entire learning process from your PC without touching the Arduino:
+
+**Complete Workflow:**
+
+1. **Click "Learn Mode"** button
+   - Arduino responds: "ENTERING LEARNING MODE"
+   - Shows: "PHASE 1: Ensure dryer is completely OFF"
+
+2. **Turn off dryer completely** (if running)
+
+3. **Click "Next Phase"** when ready
+   - Arduino measures baseline for 10 seconds
+   - LED flashes rapidly during measurement
+
+4. **Turn dryer ON** (heater + fan)
+
+5. **Click "Next Phase"** when dryer is fully running
+   - Arduino measures heater current for 10 seconds
+   - LED flashes rapidly during measurement
+
+6. **Turn heater OFF** (fan only remains running)
+
+7. **Click "Next Phase"** when only fan is running
+   - Arduino measures fan-only current for 10 seconds
+   - LED flashes rapidly during measurement
+
+8. **Done!** Arduino saves thresholds to EEPROM
+   - Shows: "LEARNING COMPLETE!"
+   - LED blinks 3 times
+
+**Benefits:**
+- No physical access to Arduino needed
+- See real-time feedback in serial monitor
+- Perfect for initial setup and troubleshooting
+- Can be done anywhere with USB connection
 
 ## Troubleshooting
 

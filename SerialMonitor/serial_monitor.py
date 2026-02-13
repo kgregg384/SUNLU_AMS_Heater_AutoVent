@@ -120,7 +120,8 @@ class SerialMonitor:
         ttk.Label(input_frame, text="Quick Commands:").pack(side=tk.LEFT, padx=5)
 
         quick_commands = [
-            ("Learn Mode", "L", "Start learning mode (5s)"),
+            ("Learn Mode", "L", "Start learning mode"),
+            ("Next Phase", "N", "Advance to next learning phase"),
             ("Open Vent", "O", "Open vent manually"),
             ("Close Vent", "C", "Close vent manually"),
             ("Recalibrate", "R", "Recalibrate servo"),

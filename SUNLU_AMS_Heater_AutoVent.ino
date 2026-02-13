@@ -1148,6 +1148,7 @@ void setup() {
   Serial.println(F("  F or f - Read current feedback (no movement)"));
   Serial.println(F("  S or s - Toggle standby mode"));
   Serial.println(F("  L or l - Enter learning mode"));
+  Serial.println(F("  N or n - Next (advance learning mode phase)"));
   Serial.println(F("  0-180  - Move servo to specified degrees"));
   Serial.println(F("Button:"));
   Serial.println(F("  Short press       - Full recalibration"));
@@ -1326,6 +1327,16 @@ void loop() {
       } else if (ch == 'L' || ch == 'l') {
         // Enter learning mode
         startLearningMode();
+      } else if (ch == 'N' || ch == 'n') {
+        // Next/advance learning mode (simulate button press)
+        if (g_learningPhase != LEARN_NONE && g_learningPhase != LEARN_COMPLETE) {
+          Serial.println(F("\n*** SERIAL COMMAND: Advancing learning phase ***"));
+          handleLearningButtonPress();
+        } else if (g_learningPhase == LEARN_NONE) {
+          Serial.println(F("Not in learning mode. Send 'L' first."));
+        } else {
+          Serial.println(F("Learning already complete."));
+        }
       }
     }
     // Buffer digits for numeric input
