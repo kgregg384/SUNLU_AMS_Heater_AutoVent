@@ -1447,6 +1447,7 @@ void loop() {
       Serial.print(F("s)"));
     }
     Serial.println();
+    Serial.flush();  // Ensure serial buffer is emptied to prevent overflow
   }
 
   // Small delay to prevent tight looping
