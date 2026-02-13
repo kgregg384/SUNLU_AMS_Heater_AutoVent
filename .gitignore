@@ -9,7 +9,6 @@ build/
 *.elf
 *.hex
 *.map
-*.uf2
 *.zip
 
 # Editor files
