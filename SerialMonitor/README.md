@@ -120,6 +120,63 @@ For advanced commands:
 
 ## Troubleshooting
 
+### "No module named serial" Error
+
+This is the most common error when running for the first time. It means pyserial isn't installed.
+
+**Quick Fix:**
+```cmd
+cd SerialMonitor
+install_dependencies.bat
+```
+
+**Or manually:**
+```cmd
+pip install pyserial
+```
+
+**Still not working? Try these:**
+
+1. **Test your setup:**
+   ```cmd
+   python test_imports.py
+   ```
+   This will show exactly what's missing
+
+2. **Install with different methods:**
+   ```cmd
+   python -m pip install pyserial
+   ```
+   Or:
+   ```cmd
+   python -m pip install --user pyserial
+   ```
+
+3. **Check Python version:**
+   ```cmd
+   python --version
+   ```
+   Needs Python 3.7 or higher
+
+4. **Multiple Python installations?**
+   - Try `python3` instead of `python`
+   - Or `py -3` on Windows
+   ```cmd
+   py -3 -m pip install pyserial
+   py -3 serial_monitor.py
+   ```
+
+5. **Run as Administrator:**
+   - Right-click Command Prompt
+   - "Run as Administrator"
+   - Then: `pip install pyserial`
+
+6. **Last resort - Build .exe (no Python needed):**
+   ```cmd
+   build_windows_exe.bat
+   ```
+   Then use `dist/SUNLU_SerialMonitor.exe`
+
 ### Port Not Detected
 
 - Click "Refresh Ports"
