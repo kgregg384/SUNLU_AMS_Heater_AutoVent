@@ -39,6 +39,11 @@
  * Version: 1.1 (Added RP2040 support)
  */
 
+// Hardware Version Selection
+// Version 1: Servo open at 10°, closed at 170°
+// Version 2: Servo open at 0°, closed at 180° (current default)
+#define HARDWARE_VERSION 2
+
 // Board detection and conditional compilation
 #if defined(ARDUINO_ARCH_SAMD)
   #define BOARD_SAMD21
@@ -103,9 +108,14 @@ static float FAN_OFF_THRESHOLD    = 0.020f;  // Below this = fan off (20mA, with
 static const float ACTIVITY_THRESHOLD    = 0.100f;  // Above this = something is running (100mA)
 static const float IDLE_THRESHOLD        = 0.080f;  // Below this = completely idle (80mA)
 
-// Servo positions in DEGREES (Adafruit method)
-static int SERVO_CLOSED_DEG = 20;   // Closed position (degrees)
-static int SERVO_OPEN_DEG   = 160;  // Open position (degrees)
+// Servo positions in DEGREES (hardware version dependent)
+#if HARDWARE_VERSION == 1
+  static int SERVO_CLOSED_DEG = 170;  // Version 1: Closed position
+  static int SERVO_OPEN_DEG   = 10;   // Version 1: Open position
+#else
+  static int SERVO_CLOSED_DEG = 20;   // Version 2: Initial (updated during calibration)
+  static int SERVO_OPEN_DEG   = 160;  // Version 2: Initial (updated during calibration)
+#endif
 
 // Feedback calibration values (Adafruit method)
 // These map feedback readings to servo positions
@@ -656,12 +666,21 @@ void calibrateFromCurrentPosition() {
   // Use fixed servo positions (no slow sweep to avoid sticking)
   Serial.println(F("\nUsing fixed servo positions..."));
 
-  // Physical servo is reversed, so we use swapped values
-  SERVO_CLOSED_DEG = 180;  // Max position for closed
-  SERVO_OPEN_DEG = 0;      // Min position for open
-
-  Serial.println(F("  CLOSED position: 180 deg"));
-  Serial.println(F("  OPEN position: 0 deg"));
+  // Set servo positions based on hardware version
+  #if HARDWARE_VERSION == 1
+    SERVO_CLOSED_DEG = 170;  // Version 1: Closed
+    SERVO_OPEN_DEG = 10;     // Version 1: Open
+    Serial.println(F("  Hardware Version 1"));
+    Serial.println(F("  CLOSED position: 170 deg"));
+    Serial.println(F("  OPEN position: 10 deg"));
+  #else
+    // Physical servo is reversed, so we use swapped values
+    SERVO_CLOSED_DEG = 180;  // Version 2: Max position for closed
+    SERVO_OPEN_DEG = 0;      // Version 2: Min position for open
+    Serial.println(F("  Hardware Version 2"));
+    Serial.println(F("  CLOSED position: 180 deg"));
+    Serial.println(F("  OPEN position: 0 deg"));
+  #endif
 
   // Calibrate feedback at each position
   Serial.println(F("\nCalibrating feedback..."));
@@ -722,12 +741,21 @@ void runFullCalibration() {
   // Use fixed servo positions (no slow sweep to avoid sticking)
   Serial.println(F("\nUsing fixed servo positions..."));
 
-  // Physical servo is reversed, so we use swapped values
-  SERVO_CLOSED_DEG = 180;  // Max position for closed
-  SERVO_OPEN_DEG = 0;      // Min position for open
-
-  Serial.println(F("  CLOSED position: 180 deg"));
-  Serial.println(F("  OPEN position: 0 deg"));
+  // Set servo positions based on hardware version
+  #if HARDWARE_VERSION == 1
+    SERVO_CLOSED_DEG = 170;  // Version 1: Closed
+    SERVO_OPEN_DEG = 10;     // Version 1: Open
+    Serial.println(F("  Hardware Version 1"));
+    Serial.println(F("  CLOSED position: 170 deg"));
+    Serial.println(F("  OPEN position: 10 deg"));
+  #else
+    // Physical servo is reversed, so we use swapped values
+    SERVO_CLOSED_DEG = 180;  // Version 2: Max position for closed
+    SERVO_OPEN_DEG = 0;      // Version 2: Min position for open
+    Serial.println(F("  Hardware Version 2"));
+    Serial.println(F("  CLOSED position: 180 deg"));
+    Serial.println(F("  OPEN position: 0 deg"));
+  #endif
 
   // Calibrate feedback at each position
   Serial.println(F("\nCalibrating feedback at each position..."));
