@@ -39,7 +39,7 @@ class SerialMonitor:
     def __init__(self, root):
         self.root = root
         self.root.title("SUNLU AMS Heater - Serial Monitor")
-        self.root.geometry("900x600")
+        self.root.geometry("1000x700")
 
         # Serial connection
         self.serial_port = None
@@ -111,6 +111,40 @@ class SerialMonitor:
         self.text_area.tag_config("cyan", foreground="#4fc1ff")
         self.text_area.tag_config("white", foreground="#d4d4d4")
         self.text_area.tag_config("gray", foreground="#808080")
+
+        # Input frame for sending commands
+        input_frame = ttk.Frame(self.root, padding="5")
+        input_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        # Quick command buttons
+        ttk.Label(input_frame, text="Quick Commands:").pack(side=tk.LEFT, padx=5)
+
+        quick_commands = [
+            ("Learn Mode", "L", "Start learning mode (5s)"),
+            ("Open Vent", "O", "Open vent manually"),
+            ("Close Vent", "C", "Close vent manually"),
+            ("Recalibrate", "R", "Recalibrate servo"),
+            ("Standby", "S", "Toggle standby mode"),
+            ("Feedback", "F", "Read servo feedback")
+        ]
+
+        for label, cmd, tooltip in quick_commands:
+            btn = ttk.Button(input_frame, text=label, width=12,
+                           command=lambda c=cmd: self.send_command(c))
+            btn.pack(side=tk.LEFT, padx=2)
+
+        # Manual input
+        input_entry_frame = ttk.Frame(self.root, padding="5")
+        input_entry_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
+
+        ttk.Label(input_entry_frame, text="Send:").pack(side=tk.LEFT, padx=5)
+        self.input_var = tk.StringVar()
+        self.input_entry = ttk.Entry(input_entry_frame, textvariable=self.input_var, width=30)
+        self.input_entry.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        self.input_entry.bind('<Return>', lambda e: self.send_manual_input())
+
+        ttk.Button(input_entry_frame, text="Send",
+                  command=self.send_manual_input).pack(side=tk.LEFT, padx=5)
 
         # Status bar
         status_frame = ttk.Frame(self.root)
@@ -265,6 +299,38 @@ class SerialMonitor:
         self.text_area.config(state=tk.NORMAL)
         self.text_area.delete(1.0, tk.END)
         self.text_area.config(state=tk.DISABLED)
+
+    def send_command(self, cmd):
+        """Send a single character command to the Arduino"""
+        if not self.is_connected or not self.serial_port:
+            self.append_text("ERROR: Not connected to serial port\n", "red")
+            return
+
+        try:
+            self.serial_port.write(cmd.encode('utf-8'))
+            self.append_text(f">>> Sent command: '{cmd}'\n", "cyan")
+            self.status_bar.config(text=f"Sent command: {cmd}")
+        except Exception as e:
+            self.append_text(f"ERROR sending command: {str(e)}\n", "red")
+
+    def send_manual_input(self):
+        """Send manual text input from entry field"""
+        text = self.input_var.get().strip()
+        if not text:
+            return
+
+        if not self.is_connected or not self.serial_port:
+            self.append_text("ERROR: Not connected to serial port\n", "red")
+            return
+
+        try:
+            # Send the text followed by newline
+            self.serial_port.write((text + '\n').encode('utf-8'))
+            self.append_text(f">>> Sent: '{text}'\n", "cyan")
+            self.status_bar.config(text=f"Sent: {text}")
+            self.input_var.set("")  # Clear input field
+        except Exception as e:
+            self.append_text(f"ERROR sending: {str(e)}\n", "red")
 
     def on_closing(self):
         """Handle window close event"""

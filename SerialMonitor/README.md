@@ -12,6 +12,8 @@ A dedicated Windows serial monitor application for the SUNLU AMS Heater Auto-Ven
   - 🟡 Yellow: Debug messages, warnings
   - 🔴 Red: Errors
   - 🔵 Cyan: Calibration messages
+- ⌨️ **Send commands to Arduino** with quick buttons or manual input
+- 🎓 **Learn Mode** - Start learning mode without pressing button on device
 - 🖥️ **Clean, simple interface**
 - 📋 **Real-time monitoring** at 115200 baud
 
@@ -81,6 +83,40 @@ A dedicated Windows serial monitor application for the SUNLU AMS Heater Auto-Ven
 - **Connect/Disconnect**: Manually control connection
 - **Clear**: Clear the output window
 - **Auto-reconnect**: Enable/disable automatic reconnection
+
+### Sending Commands
+
+#### Quick Command Buttons
+
+Use the quick command buttons to send common commands without typing:
+
+- **Learn Mode** (L): Start learning mode to calibrate thresholds
+  - Initiates 3-phase learning process
+  - Follow on-screen prompts from Arduino
+  - No need to press button on device!
+
+- **Open Vent** (O): Manually open the vent
+
+- **Close Vent** (C): Manually close the vent
+
+- **Recalibrate** (R): Recalibrate servo positions
+
+- **Standby** (S): Toggle standby/wake mode
+
+- **Feedback** (F): Read current servo position feedback
+
+#### Manual Input
+
+For advanced commands:
+
+1. Type command in the "Send:" text field
+2. Press Enter or click "Send" button
+3. Command is sent to Arduino
+
+**Examples:**
+- Type `90` to move servo to 90 degrees
+- Type `L` to start learning mode
+- Any single character or number supported by Arduino firmware
 
 ## Troubleshooting
 
