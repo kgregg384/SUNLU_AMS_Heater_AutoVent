@@ -1243,26 +1243,7 @@ void loop() {
 
   g_lastButtonState = currentButtonState;
 
-  // Handle learning mode processing (if active)
-  if (g_learningPhase != LEARN_NONE) {
-    processLearningPhase();
-    return;  // Skip normal operation when in learning mode
-  }
-
-  // Update LED pattern (handles all LED states now)
-  updateLEDPattern();
-
-  // Update built-in LED breathing effect (RP2040 only)
-  #ifdef BOARD_RP2040
-    if (g_systemOn) {  // Only breathe when system is active
-      updateBuiltinLEDBreathing();
-    } else {
-      neopixel.setPixelColor(0, 0);  // Turn off in standby
-      neopixel.show();
-    }
-  #endif
-
-  // Check for serial commands
+  // Check for serial commands (MUST be before learning mode processing to allow 'N' command)
   while (Serial.available()) {
     char ch = Serial.read();
 
@@ -1344,6 +1325,25 @@ void loop() {
       g_serialBuffer[g_serialIdx++] = ch;
     }
   }
+
+  // Handle learning mode processing (if active)
+  if (g_learningPhase != LEARN_NONE) {
+    processLearningPhase();
+    return;  // Skip normal operation when in learning mode
+  }
+
+  // Update LED pattern (handles all LED states now)
+  updateLEDPattern();
+
+  // Update built-in LED breathing effect (RP2040 only)
+  #ifdef BOARD_RP2040
+    if (g_systemOn) {  // Only breathe when system is active
+      updateBuiltinLEDBreathing();
+    } else {
+      neopixel.setPixelColor(0, 0);  // Turn off in standby
+      neopixel.show();
+    }
+  #endif
 
   // Skip all monitoring when in standby mode
   if (!g_systemOn) {
