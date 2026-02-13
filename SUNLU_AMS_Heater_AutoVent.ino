@@ -36,8 +36,13 @@
  *
  * Author: Generated with Claude Code
  * License: MIT
- * Version: 1.1 (Added RP2040 support)
+ * Version: See FIRMWARE_VERSION below
  */
+
+// Firmware Version (Semantic Versioning)
+#define FIRMWARE_VERSION "2.0.0"
+#define FIRMWARE_DATE __DATE__
+#define FIRMWARE_TIME __TIME__
 
 // Hardware Version Selection
 // Version 1: Servo open at 10°, closed at 170°
@@ -1116,6 +1121,14 @@ void setup() {
 
   Serial.println(F("\n\n========================================"));
   Serial.println(F("SUNLU AMS Heater Auto-Vent Controller"));
+  Serial.print(F("Firmware Version: "));
+  Serial.println(F(FIRMWARE_VERSION));
+  Serial.print(F("Build Date: "));
+  Serial.print(F(FIRMWARE_DATE));
+  Serial.print(F(" "));
+  Serial.println(F(FIRMWARE_TIME));
+  Serial.print(F("Hardware Version: "));
+  Serial.println(HARDWARE_VERSION);
   Serial.print(F("Board: Seeed XIAO "));
   Serial.println(F(MY_BOARD_NAME));
   Serial.println(F("ADS1115 + ACS758 + Servo"));
