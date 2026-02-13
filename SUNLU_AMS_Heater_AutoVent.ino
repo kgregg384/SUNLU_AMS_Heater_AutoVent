@@ -139,6 +139,7 @@ float g_currentSamples[MAX_SAMPLES];
 uint8_t g_sampleIndex = 0;
 uint8_t g_sampleCount = 0;
 uint32_t g_lastUpdateMs = 0;
+uint32_t g_lastDebugOutputMs = 0;  // Timer for debug output throttling
 
 // Vent control state
 bool g_ventOpen = false;
@@ -1443,35 +1444,39 @@ void loop() {
       }
     }
 
-    // Display debug information - single condensed line
-    float rawV = readVolts(ADS_CH_CURRENT);
-    Serial.print(now / 1000);
-    Serial.print(F("s | Offset: "));
-    Serial.print(g_voltageOffset, 4);
-    Serial.print(F("V | Raw: "));
-    Serial.print(rawV, 4);
-    Serial.print(F("V | Irms: "));
-    Serial.print(Irms, 4);
-    Serial.print(F("A | Avg: "));
-    Serial.print(rollingAvgIrms, 4);
-    Serial.print(F("A ("));
-    Serial.print(g_sampleCount);
-    Serial.print(F("/"));
-    Serial.print(MAX_SAMPLES);
-    Serial.print(F(") | Fan: "));
-    Serial.print(g_fanOn ? F("ON ") : F("OFF"));
-    Serial.print(F(" | Heat: "));
-    Serial.print(g_heaterOn ? F("ON ") : F("OFF"));
-    Serial.print(F(" | Vent: "));
-    Serial.print(g_ventOpen ? F("OPEN") : F("CLOSED"));
-    if (g_ventClosePending) {
-      uint32_t remaining = (VENT_CLOSE_DELAY_MS - (now - g_ventCloseDelayStart)) / 1000;
-      Serial.print(F(" ("));
-      Serial.print(remaining);
-      Serial.print(F("s)"));
+    // Display debug information - throttled to once every 5 seconds
+    if (now - g_lastDebugOutputMs >= 5000) {
+      g_lastDebugOutputMs = now;
+
+      float rawV = readVolts(ADS_CH_CURRENT);
+      Serial.print(now / 1000);
+      Serial.print(F("s | Offset: "));
+      Serial.print(g_voltageOffset, 4);
+      Serial.print(F("V | Raw: "));
+      Serial.print(rawV, 4);
+      Serial.print(F("V | Irms: "));
+      Serial.print(Irms, 4);
+      Serial.print(F("A | Avg: "));
+      Serial.print(rollingAvgIrms, 4);
+      Serial.print(F("A ("));
+      Serial.print(g_sampleCount);
+      Serial.print(F("/"));
+      Serial.print(MAX_SAMPLES);
+      Serial.print(F(") | Fan: "));
+      Serial.print(g_fanOn ? F("ON ") : F("OFF"));
+      Serial.print(F(" | Heat: "));
+      Serial.print(g_heaterOn ? F("ON ") : F("OFF"));
+      Serial.print(F(" | Vent: "));
+      Serial.print(g_ventOpen ? F("OPEN") : F("CLOSED"));
+      if (g_ventClosePending) {
+        uint32_t remaining = (VENT_CLOSE_DELAY_MS - (now - g_ventCloseDelayStart)) / 1000;
+        Serial.print(F(" ("));
+        Serial.print(remaining);
+        Serial.print(F("s)"));
+      }
+      Serial.println();
+      Serial.flush();  // Ensure serial buffer is emptied to prevent overflow
     }
-    Serial.println();
-    Serial.flush();  // Ensure serial buffer is emptied to prevent overflow
   }
 
   // Small delay to prevent tight looping
