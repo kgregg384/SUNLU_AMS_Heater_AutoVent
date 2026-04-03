@@ -167,19 +167,19 @@ You can also use any serial terminal at 115200 baud. Available commands:
 ## Project Structure
 
 ```
-SUNLU_AMS_Heater_AutoVent.ino        # Main firmware (SAMD21 + RP2040)
+SUNLU_AMS_Heater_AutoVent.ino             # Main firmware (SAMD21 + RP2040)
 SUNLU_AMS_Heater_AutoVent_RP2040_v1.uf2   # Pre-built UF2 — RP2040, v1 design
 SUNLU_AMS_Heater_AutoVent_RP2040_v2.uf2   # Pre-built UF2 — RP2040, v2 design
 SUNLU_AMS_Heater_AutoVent_SAMD21_v1.uf2   # Pre-built UF2 — SAMD21, v1 design
 SUNLU_AMS_Heater_AutoVent_SAMD21_v2.uf2   # Pre-built UF2 — SAMD21, v2 design
-SerialMonitor/                        # GUI serial monitor app (Python/tkinter)
-  serial_monitor.py                   #   Main application
-  requirements.txt                    #   Python dependencies
-  install_dependencies.bat            #   Windows dependency installer
-  build_windows_exe.bat               #   Build standalone .exe
-build/                                # Arduino CLI board FQBNs
-USER_GUIDE.md                         # End-user documentation
-TECHNICAL_SPECIFICATION.md            # Technical reference
+SerialMonitor/                             # GUI serial monitor app (Python/tkinter)
+  serial_monitor.py                        #   Main application
+  requirements.txt                         #   Python dependencies
+  install_dependencies.bat                 #   Windows dependency installer
+  build_windows_exe.bat                    #   Build standalone .exe
+  test_imports.py                          #   Dependency verification script
+USER_GUIDE.md                              # End-user documentation
+TECHNICAL_SPECIFICATION.md                 # Technical reference
 ```
 
 ## PCBs and Kits
