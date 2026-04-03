@@ -75,8 +75,10 @@ STL files for the vent mechanism and mounting hardware are available in this rep
 1. Connect your XIAO RP2040 while holding the BOOT button to enter bootloader mode
 2. A USB drive named `RPI-RP2` will appear
 3. Drag and drop the appropriate UF2 file onto the drive:
-   - `SUNLU_AMS_Heater_AutoVent_v1.uf2` — hardware version 1
-   - `SUNLU_AMS_Heater_AutoVent_v2.uf2` — hardware version 2
+   - `SUNLU_AMS_Heater_AutoVent_v1.uf2` — for the v1 3D printed design
+   - `SUNLU_AMS_Heater_AutoVent_v2.uf2` — for the v2 3D printed design
+   
+   The v1 and v2 designs drive the vent from opposite sides, so the servo travel direction for open/close is reversed between them. Choose the file that matches your printed parts.
 4. The board reboots automatically and starts running
 
 **Option B: Compile from source**
