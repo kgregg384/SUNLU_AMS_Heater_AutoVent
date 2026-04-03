@@ -2,11 +2,11 @@
 """
 SUNLU AMS Heater Auto-Vent Serial Monitor
 ==========================================
-A Windows serial monitor application with auto-detection, auto-reconnect,
+A serial monitor application with auto-detection, auto-reconnect,
 and color-coded output parsing for the SUNLU AMS Heater controller.
 
 Features:
-- Auto-detect Arduino/SAMD21 boards
+- Auto-detect Seeed XIAO boards (SAMD21 and RP2040)
 - Auto-reconnect on disconnect
 - Color-coded output for easy reading
 - Clean, simple UI
@@ -162,10 +162,10 @@ class SerialMonitor:
 
         self.port_combo['values'] = port_list
 
-        # Try to auto-select Arduino/SAMD21
+        # Try to auto-select Seeed XIAO (SAMD21 or RP2040)
         arduino_port = None
         for port in ports:
-            # Look for common Arduino/Seeed VID/PID
+            # Look for Seeed XIAO (SAMD21/RP2040) or Arduino VID
             if port.vid in [0x2341, 0x2886]:  # Arduino, Seeed
                 arduino_port = port.device
                 break
@@ -301,7 +301,7 @@ class SerialMonitor:
         self.text_area.config(state=tk.DISABLED)
 
     def send_command(self, cmd):
-        """Send a single character command to the Arduino"""
+        """Send a single character command to the controller"""
         if not self.is_connected or not self.serial_port:
             self.append_text("ERROR: Not connected to serial port\n", "red")
             return

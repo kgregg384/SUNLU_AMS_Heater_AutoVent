@@ -1,10 +1,10 @@
 # SUNLU AMS Heater Serial Monitor
 
-A dedicated Windows serial monitor application for the SUNLU AMS Heater Auto-Vent Controller.
+A serial monitor application for the SUNLU AMS Heater Auto-Vent Controller. Works on Windows, Mac, and Linux.
 
 ## Features
 
-- 🔍 **Auto-detect** Arduino/SAMD21 boards
+- 🔍 **Auto-detect** Seeed XIAO boards (SAMD21 and RP2040)
 - 🔄 **Auto-reconnect** on USB disconnect
 - 🎨 **Color-coded output** for easy reading:
   - 🟢 Green: Opening vent, heater on
@@ -54,7 +54,7 @@ A dedicated Windows serial monitor application for the SUNLU AMS Heater Auto-Ven
 
 4. **Run it**:
    - Double-click `SUNLU_SerialMonitor.exe`
-   - Connect your SAMD21 board via USB
+   - Connect your XIAO board via USB
    - Monitor auto-detects and connects
 
 ## Usage
@@ -62,7 +62,7 @@ A dedicated Windows serial monitor application for the SUNLU AMS Heater Auto-Ven
 ### Basic Operation
 
 1. **Connect Board**:
-   - Plug in SAMD21 via USB
+   - Plug in your XIAO board via USB
    - App auto-detects and connects
    - Green "Connected" status appears
 
