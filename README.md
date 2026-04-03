@@ -155,7 +155,6 @@ SerialMonitor/                        # GUI serial monitor app (Python/tkinter)
   requirements.txt                    #   Python dependencies
   install_dependencies.bat            #   Windows dependency installer
   build_windows_exe.bat               #   Build standalone .exe
-RP2040_Hardware_Test/                 # Standalone hardware test sketch for RP2040
 build/                                # Arduino CLI board FQBNs
 USER_GUIDE.md                         # End-user documentation
 TECHNICAL_SPECIFICATION.md            # Technical reference
