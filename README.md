@@ -70,18 +70,22 @@ STL files for the vent mechanism and mounting hardware are available in this rep
 
 ### Upload Firmware
 
-**Option A: Pre-built UF2 (RP2040 only — no Arduino IDE needed)**
+**Option A: Pre-built UF2 (no Arduino IDE needed)**
 
-*Note: The SAMD21 does not support UF2 flashing. If you're using a SAMD21, skip to Option B.*
+1. Enter bootloader mode:
+   - **RP2040**: Hold the BOOT button while connecting USB-C. A drive named `RPI-RP2` will appear.
+   - **SAMD21**: Double-tap the reset pads. A drive named `Arduino` will appear.
+2. Drag and drop the appropriate UF2 file onto the drive:
 
-1. Connect your XIAO RP2040 while holding the BOOT button to enter bootloader mode
-2. A USB drive named `RPI-RP2` will appear
-3. Drag and drop the appropriate UF2 file onto the drive:
-   - `SUNLU_AMS_Heater_AutoVent_v1.uf2` — for the v1 3D printed design
-   - `SUNLU_AMS_Heater_AutoVent_v2.uf2` — for the v2 3D printed design
-   
-   The v1 and v2 designs drive the vent from opposite sides, so the servo travel direction for open/close is reversed between them. Choose the file that matches your printed parts.
-4. The board reboots automatically and starts running
+   | File | Board | Design |
+   |------|-------|--------|
+   | `SUNLU_AMS_Heater_AutoVent_RP2040_v1.uf2` | RP2040 | v1 |
+   | `SUNLU_AMS_Heater_AutoVent_RP2040_v2.uf2` | RP2040 | v2 |
+   | `SUNLU_AMS_Heater_AutoVent_SAMD21_v1.uf2` | SAMD21 | v1 |
+   | `SUNLU_AMS_Heater_AutoVent_SAMD21_v2.uf2` | SAMD21 | v2 |
+
+   The v1 and v2 versions correspond to different 3D printed designs that drive the vent from opposite sides, reversing the servo travel direction. Choose the file that matches your board and printed parts.
+3. The board reboots automatically and starts running
 
 **Option B: Compile from source (SAMD21 or RP2040)**
 
@@ -164,8 +168,10 @@ You can also use any serial terminal at 115200 baud. Available commands:
 
 ```
 SUNLU_AMS_Heater_AutoVent.ino        # Main firmware (SAMD21 + RP2040)
-SUNLU_AMS_Heater_AutoVent_v1.uf2     # Pre-built firmware for hardware v1 (RP2040)
-SUNLU_AMS_Heater_AutoVent_v2.uf2     # Pre-built firmware for hardware v2 (RP2040)
+SUNLU_AMS_Heater_AutoVent_RP2040_v1.uf2   # Pre-built UF2 — RP2040, v1 design
+SUNLU_AMS_Heater_AutoVent_RP2040_v2.uf2   # Pre-built UF2 — RP2040, v2 design
+SUNLU_AMS_Heater_AutoVent_SAMD21_v1.uf2   # Pre-built UF2 — SAMD21, v1 design
+SUNLU_AMS_Heater_AutoVent_SAMD21_v2.uf2   # Pre-built UF2 — SAMD21, v2 design
 SerialMonitor/                        # GUI serial monitor app (Python/tkinter)
   serial_monitor.py                   #   Main application
   requirements.txt                    #   Python dependencies
