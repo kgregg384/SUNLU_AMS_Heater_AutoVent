@@ -18,6 +18,10 @@ build/
 .vscode/
 .idea/
 
+# Claude Code
+CLAUDE.md
+.claude/
+
 # Temporary files
 *.tmp
 *.bak
