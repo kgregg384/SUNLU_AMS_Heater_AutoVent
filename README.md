@@ -72,6 +72,8 @@ STL files for the vent mechanism and mounting hardware are available in this rep
 
 **Option A: Pre-built UF2 (RP2040 only — no Arduino IDE needed)**
 
+*Note: The SAMD21 does not support UF2 flashing. If you're using a SAMD21, skip to Option B.*
+
 1. Connect your XIAO RP2040 while holding the BOOT button to enter bootloader mode
 2. A USB drive named `RPI-RP2` will appear
 3. Drag and drop the appropriate UF2 file onto the drive:
