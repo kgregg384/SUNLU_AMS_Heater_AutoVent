@@ -18,7 +18,7 @@ build/
 .vscode/
 .idea/
 
-# Claude Code
+# Dev config
 CLAUDE.md
 .claude/
 
