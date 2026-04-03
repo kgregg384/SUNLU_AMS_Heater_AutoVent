@@ -363,4 +363,4 @@ This device is intended for personal/hobbyist use. For commercial deployment, co
 
 **Document Version**: 1.0
 **Last Updated**: January 27, 2024
-**Author**: Generated with Claude Code
+**Author**: Kevin Gregg

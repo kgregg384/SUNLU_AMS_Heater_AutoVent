@@ -34,7 +34,6 @@
  * - A0: ACS758 current sensor output
  * - A1: Servo position feedback
  *
- * Author: Generated with Claude Code
  * License: MIT
  * Version: See FIRMWARE_VERSION below
  */

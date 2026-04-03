@@ -297,6 +297,3 @@ pyinstaller --onefile --windowed --name="SUNLU_SerialMonitor" serial_monitor.py
 
 MIT License - See main project LICENSE file
 
-## Credits
-
-Generated with [Claude Code](https://claude.com/claude-code)

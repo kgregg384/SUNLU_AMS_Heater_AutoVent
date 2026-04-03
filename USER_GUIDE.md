@@ -595,5 +595,4 @@ Check the GitHub repository for:
 **PCBs and Kits Available**: [3dcreator.shop](https://3dcreator.shop)
 **Open Source Repository**: [github.com/kgregg384/SUNLU_AMS_Heater_AutoVent](https://github.com/kgregg384/SUNLU_AMS_Heater_AutoVent)
 
-© 2024 - Firmware and documentation created with assistance from Claude Code
 This is an open-source hardware project. PCBs and component kits available from 3dcreator.shop

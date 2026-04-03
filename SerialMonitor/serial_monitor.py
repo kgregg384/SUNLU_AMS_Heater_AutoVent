@@ -23,7 +23,6 @@ Or build as standalone .exe:
     pip install pyinstaller
     pyinstaller --onefile --windowed --name="SUNLU_SerialMonitor" serial_monitor.py
 
-Author: Generated with Claude Code
 License: MIT
 """
 
