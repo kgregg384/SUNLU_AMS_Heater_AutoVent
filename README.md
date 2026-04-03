@@ -81,12 +81,24 @@ STL files for the vent mechanism and mounting hardware are available in this rep
    The v1 and v2 designs drive the vent from opposite sides, so the servo travel direction for open/close is reversed between them. Choose the file that matches your printed parts.
 4. The board reboots automatically and starts running
 
-**Option B: Compile from source**
+**Option B: Compile from source (SAMD21 or RP2040)**
 
-1. Connect your XIAO board via USB-C
-2. Select the correct board in Arduino IDE
-3. Open `SUNLU_AMS_Heater_AutoVent.ino`
-4. Upload
+1. Install the [Arduino IDE](https://www.arduino.cc/ide)
+2. Add the Seeed board package:
+   - Go to **File > Preferences**
+   - Add this URL to **Additional Board Manager URLs**:
+     - SAMD21: `https://files.seeedstudio.com/arduino/package_seeeduino_boards_index.json`
+     - RP2040: `https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json`
+   - Go to **Tools > Board > Board Manager**, search for "Seeed" or "RP2040", and install
+3. Install required libraries via **Tools > Manage Libraries**:
+   - `Adafruit ADS1X15`
+   - `FlashStorage` (SAMD21 only)
+4. Connect your XIAO board via USB-C
+5. Select the correct board under **Tools > Board**:
+   - SAMD21: **Seeeduino XIAO**
+   - RP2040: **Seeed XIAO RP2040**
+6. Select the correct port under **Tools > Port**
+7. Open `SUNLU_AMS_Heater_AutoVent.ino` and click **Upload**
 
 The firmware automatically detects which board it's running on at compile time — no configuration needed.
 
