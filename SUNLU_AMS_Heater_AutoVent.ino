@@ -991,8 +991,9 @@ void processLearningPhase() {
             FAN_OFF_THRESHOLD = FAN_ON_THRESHOLD - 0.005f;  // 5mA hysteresis
 
             // Heater threshold = halfway between fan-only and heater
+            // Heat OFF must sit ABOVE fan-only current so it trips when heater stops but fan continues
             HEATER_ON_THRESHOLD = (g_learnedFanOnly + g_learnedHeater) / 2.0f;
-            HEATER_OFF_THRESHOLD = (g_learnedBaseline + g_learnedFanOnly) / 2.0f + 0.005f;
+            HEATER_OFF_THRESHOLD = g_learnedFanOnly + (g_learnedHeater - g_learnedFanOnly) * 0.25f;
 
             // Save to EEPROM
             saveThresholdsToEEPROM();
