@@ -66,6 +66,9 @@
   #define SERVO_PWM_PIN    D0   // Servo PWM output (GPIO26)
   #define LED_PIN          D10  // Status LED (GPIO3)
   #define BUTTON_PIN       D3   // Button input (GPIO29)
+  #define DRV_AIN1_PIN     D1   // DRV8833 AIN1 - actuator extend (GPIO0)
+  #define DRV_AIN2_PIN     D2   // DRV8833 AIN2 - actuator retract (GPIO1)
+  #define DRV_FAN_PIN      D8   // DRV8833 BIN1 - fan on/off (GPIO2); BIN2 tied to GND
   // GPIO numbers for RP2040 hardware control
   #define GPIO_SERVO       26   // D0 = GPIO26
   #define GPIO_LED         3    // D10 = GPIO3
@@ -74,6 +77,9 @@
   #define SERVO_PWM_PIN    0    // Servo PWM output
   #define LED_PIN          10   // Status LED
   #define BUTTON_PIN       3    // Button input
+  #define DRV_AIN1_PIN     1    // DRV8833 AIN1 - actuator extend
+  #define DRV_AIN2_PIN     2    // DRV8833 AIN2 - actuator retract
+  #define DRV_FAN_PIN      8    // DRV8833 BIN1 - fan on/off; BIN2 tied to GND
 #endif
 
 // ----------------- Constants -----------------
@@ -127,6 +133,12 @@ bool g_heaterWasOn = false;
 uint32_t g_ventCloseDelayStart = 0;
 bool g_ventClosePending = false;
 static const uint32_t VENT_CLOSE_DELAY_MS = 180000;  // 3 minute delay before closing
+
+// DRV8833 actuator + fan state
+static const uint32_t ACTUATOR_TRAVEL_MS = 8000;  // Drive time before coasting - tune to full stroke
+uint32_t g_actuatorStartMs = 0;
+bool g_actuatorMoving = false;
+bool g_fanRunning = false;
 
 // Device state detection (global so they can be reset during calibration)
 bool g_fanOn = false;
@@ -532,16 +544,56 @@ void moveServo(int degrees) {
   Serial.println(F("Servo detached"));
 }
 
+// DRV8833 actuator + fan helpers
+static void extendActuators() {
+  digitalWrite(DRV_AIN1_PIN, HIGH);
+  digitalWrite(DRV_AIN2_PIN, LOW);
+  g_actuatorStartMs = millis();
+  g_actuatorMoving = true;
+  Serial.println(F("Actuators extending"));
+}
+
+static void retractActuators() {
+  digitalWrite(DRV_AIN1_PIN, LOW);
+  digitalWrite(DRV_AIN2_PIN, HIGH);
+  g_actuatorStartMs = millis();
+  g_actuatorMoving = true;
+  Serial.println(F("Actuators retracting"));
+}
+
+static void stopActuators() {
+  digitalWrite(DRV_AIN1_PIN, LOW);
+  digitalWrite(DRV_AIN2_PIN, LOW);
+  g_actuatorMoving = false;
+  Serial.println(F("Actuators coasting"));
+}
+
+static void fanOn() {
+  digitalWrite(DRV_FAN_PIN, HIGH);
+  g_fanRunning = true;
+  Serial.println(F("Fan ON"));
+}
+
+static void fanOff() {
+  digitalWrite(DRV_FAN_PIN, LOW);
+  g_fanRunning = false;
+  Serial.println(F("Fan OFF"));
+}
+
 // Close vent
 void closeVent() {
   Serial.println(F("CLOSING VENT"));
   moveServo(SERVO_CLOSED_DEG);
+  retractActuators();
+  fanOff();
 }
 
 // Open vent
 void openVent() {
   Serial.println(F("OPENING VENT"));
   moveServo(SERVO_OPEN_DEG);
+  extendActuators();
+  fanOn();
 }
 
 // Recalibrate servo using Adafruit method
@@ -977,6 +1029,14 @@ void setup() {
   digitalWrite(LED_PIN, LOW);  // LED off initially
   digitalWrite(LED_BUILTIN, LOW);  // LED off Initially
 
+  // DRV8833 outputs - coast actuators and disable fan at startup
+  pinMode(DRV_AIN1_PIN, OUTPUT);
+  pinMode(DRV_AIN2_PIN, OUTPUT);
+  pinMode(DRV_FAN_PIN,  OUTPUT);
+  digitalWrite(DRV_AIN1_PIN, LOW);
+  digitalWrite(DRV_AIN2_PIN, LOW);
+  digitalWrite(DRV_FAN_PIN,  LOW);
+
   Serial.begin(115200);
 
   // Wait for Serial with timeout
@@ -1032,6 +1092,12 @@ void setup() {
 void loop() {
   static bool longPressExecuted = false;  // Declare at function scope
   uint32_t now = millis();
+
+  // Coast actuators once they've had time to reach their endstop.
+  // Runs unconditionally so it fires even during standby / learning mode.
+  if (g_actuatorMoving && (now - g_actuatorStartMs >= ACTUATOR_TRAVEL_MS)) {
+    stopActuators();
+  }
 
   // Check for button press FIRST (before learning mode processing)
   bool currentButtonState = digitalRead(BUTTON_PIN);
@@ -1185,6 +1251,14 @@ void loop() {
       } else if (ch == 'L' || ch == 'l') {
         // Enter learning mode
         startLearningMode();
+      } else if (ch == 'A' || ch == 'a') {
+        extendActuators();
+      } else if (ch == 'Z' || ch == 'z') {
+        retractActuators();
+      } else if (ch == 'X' || ch == 'x') {
+        stopActuators();
+      } else if (ch == 'V' || ch == 'v') {
+        if (g_fanRunning) fanOff(); else fanOn();
       }
     }
     // Buffer digits for numeric input
