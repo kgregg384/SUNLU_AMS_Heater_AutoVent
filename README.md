@@ -52,7 +52,9 @@ ADS1115 channels: A0 = current sensor, A1 = servo feedback.
 
 ### 3D Printed Parts
 
-STL files for the vent mechanism and mounting hardware are available in this repository. Approximate print time: ~4 hours.
+STL files for the vent mechanism and mounting hardware are available at MakerWorld. Approximate print time: ~4 hours.
+  - V1: https://makerworld.com/en/models/2038244-sunlu-ams-heater-autovent#profileId-2198796
+  - V2: https://makerworld.com/en/models/2344707-autovent-2-0-for-sunlu-ams-heater#profileId-2563439
 
 ## Getting Started
 
