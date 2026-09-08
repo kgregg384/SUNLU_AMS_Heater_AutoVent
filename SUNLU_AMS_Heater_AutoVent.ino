@@ -21,13 +21,13 @@
  * - Current Sensor: ACS758 LCB-050B (AC current, 40mV/A sensitivity)
  * - ADC: ADS1115 16-bit I2C ADC (±4.096V range)
  * - Servo: Feedback-enabled servo motor
- * - LED: Status indicator (active low)
+ * - LED: Status indicator (active high, 220Ohm series to GND)
  * - Button: Momentary push button (active low, internal pullup)
  *
  * Pin Configuration (identical physical pins on both boards):
  * - D0: Servo PWM output
  * - D3: Button input (active low, internal pullup)
- * - D10: Status LED (active low)
+ * - D10: Status LED (active high, 220Ohm series to GND)
  * - SDA/SCL: I2C bus for ADS1115
  *
  * ADS1115 Channel Mapping:
@@ -111,6 +111,39 @@ static float FAN_OFF_THRESHOLD    = 0.020f;  // Below this = fan off (20mA, with
 // This is what you'll likely use for actual vent control
 static const float ACTIVITY_THRESHOLD    = 0.100f;  // Above this = something is running (100mA)
 static const float IDLE_THRESHOLD        = 0.080f;  // Below this = completely idle (80mA)
+
+// ----------------- ACS758 Self-Test Configuration -----------------
+// The ACS758 is a ratiometric sensor: with no current flowing, a BIDIRECTIONAL
+// variant parks its output at Vcc/2. At the 5V sensor supply that is ~2.500V.
+// The ADS1115 runs off 3.3V, so anything it reads clamps near 3.3V regardless
+// of the +/-4.096V GAIN_ONE full scale.
+//
+// NOTE: verify ACS_VQ_NOMINAL against a real board before trusting the PASS
+// window - if this sensor is a UNIdirectional variant the quiescent point is
+// ~0.12*Vcc (~0.6V) instead, and every reading below will look like a fault.
+static const float ACS_VCC_NOMINAL   = 5.000f;                    // ACS758 supply rail
+static const float ACS_VQ_NOMINAL    = ACS_VCC_NOMINAL * 0.5f;    // Expected idle output (bidirectional)
+static const float ACS_VQ_TOL        = 0.350f;  // +/- window around Vq counted as healthy
+static const float ACS_V_DEAD_LOW    = 0.200f;  // Below this = dead short / no signal
+static const float ACS_V_RAIL_HIGH   = 3.200f;  // Above this = pinned at the ADS 3.3V rail
+static const float ACS_V_IMPOSSIBLE   = 1.000f;  // |mean-Vq| beyond this cannot be a healthy sensor
+static const float ACS_NOISE_MAX_V   = 0.050f;  // Idle pk-pk above this = noisy or live load
+static const float ACS_FLOAT_DRAG_V  = 0.030f;  // Mux settling drag that implies a high-Z pin
+static const float ACS_FLOAT_MIN_SEP = 0.500f;  // Min A1-vs-A0 separation for the drag test
+static const uint8_t ACS_TEST_SAMPLES = 64;     // Samples used for the DC/noise measurement
+
+// Self-test verdicts, worst-first
+enum AcsTestResult {
+  ACS_PASS = 0,
+  ACS_WARN_NOISY,
+  ACS_WARN_OFF_NOMINAL,
+  ACS_FAIL_FLOATING,
+  ACS_FAIL_BIAS,
+  ACS_FAIL_LOW,
+  ACS_FAIL_HIGH
+};
+
+AcsTestResult g_acsTestResult = ACS_PASS;
 
 // Servo positions in DEGREES (hardware version dependent)
 #if HARDWARE_VERSION == 1
@@ -597,6 +630,182 @@ float calculateOffset(uint32_t ms) {
   Serial.println(F(" samples"));
 
   return offset;
+}
+
+// ----------------- ACS758 / PCB Connectivity Self-Test -----------------
+//
+// Checks that the current sensor is actually wired to ADS1115 A0 and alive,
+// without needing any load current. Three independent checks:
+//
+//   1. DC bias    - an idle bidirectional ACS758 sits at Vcc/2 (~2.5V). Near 0V
+//                   means no signal (unpowered sensor, open VOUT trace, or VOUT
+//                   shorted to GND). Near the 3.3V rail means VOUT is shorted
+//                   high or the ADS input is clamping.
+//   2. Mux drag   - the ADS1115 multiplexes one sampling capacitor across all
+//                   four inputs. Charge it up on A1 (servo feedback), then read
+//                   A0 immediately: a low-impedance driven pin pulls the cap to
+//                   its own voltage in the first conversion, while a FLOATING
+//                   pin lets the residual A1 charge dominate and then drifts
+//                   over the next few reads. A large first-read-vs-settled
+//                   delta means A0 is not actually connected to anything.
+//   3. Noise floor- a healthy idle sensor is quiet (a few mV pk-pk). A large
+//                   spread means either real load current (dryer powered on) or
+//                   a floating/noise-coupled input.
+//
+// CAUTION: check 2 is a heuristic, not a datasheet-guaranteed behavior, AND on
+// the current PCB it is expected to be DEAD CODE: C4 (.1uF) sits on the A0 net
+// at the ADS side of R5, so A0 is never high-impedance from the ADC's point of
+// view and the sampling cap always finds charge locally. Check 1 is what
+// actually catches a disconnected sensor here - with the sensor unplugged, C4
+// has nothing to charge it and A0 sits near 0V, tripping ACS_FAIL_LOW.
+// Check 2 is retained only for a future board that drops C4. Validate it on the
+// bench before trusting it; ACS_FLOAT_DRAG_V is the knob to tune.
+//
+// PCB CONTEXT (from AutoVent_KiCad/SAMD21 Schematic.kicad_sch):
+//   J4 "ACS_Conn" = UNKEYED 1x03 2.54mm header - pin1 +5V, pin2 GND, pin3 VOUT
+//   VOUT -> R5 (1k series) -> A0 -> C4 (.1uF to GND) -> J3 ADS1115 breakout
+//   R5 limits back-drive into the ADC to ~1.4mA if J4 is reversed.
+//
+AcsTestResult runAcsSelfTest(bool verbose) {
+  if (verbose) {
+    Serial.println(F("\n--- ACS758 CONNECTIVITY SELF-TEST ---"));
+  }
+
+  // --- Check 1 + 3: DC bias and noise floor on A0 ---
+  double sum = 0.0;
+  float vMin = 1e6f, vMax = -1e6f;
+  for (uint8_t i = 0; i < ACS_TEST_SAMPLES; i++) {
+    float v = readVolts(ADS_CH_CURRENT);
+    sum += v;
+    if (v < vMin) vMin = v;
+    if (v > vMax) vMax = v;
+  }
+  float vMean = (float)(sum / ACS_TEST_SAMPLES);
+  float vPkPk = vMax - vMin;
+
+  // --- Check 2: mux settling drag (floating-input detector) ---
+  // Park the ADS sampling cap on A1, then watch how A0 behaves on the very
+  // first conversion versus after it has had several conversions to settle.
+  float vRef = 0.0f;
+  for (uint8_t i = 0; i < 4; i++) vRef = readVolts(ADS_CH_SERVO_FB);
+  float vFirst = readVolts(ADS_CH_CURRENT);
+  float vSettled = 0.0f;
+  for (uint8_t i = 0; i < 8; i++) vSettled = readVolts(ADS_CH_CURRENT);
+  float drag = vFirst - vSettled;
+
+  // The test only means anything if A1 sits far enough away from A0 to pull it.
+  bool dragValid = (fabsf(vRef - vSettled) >= ACS_FLOAT_MIN_SEP);
+  // A floating pin gets dragged TOWARD A1, so require the sign to agree.
+  bool draggedTowardRef = ((vRef > vSettled) && (drag > 0.0f)) ||
+                          ((vRef < vSettled) && (drag < 0.0f));
+  bool floating = dragValid && draggedTowardRef && (fabsf(drag) >= ACS_FLOAT_DRAG_V);
+
+  // --- Verdict, worst fault wins ---
+  AcsTestResult result;
+  if (vMean < ACS_V_DEAD_LOW) {
+    result = ACS_FAIL_LOW;
+  } else if (vMean > ACS_V_RAIL_HIGH) {
+    result = ACS_FAIL_HIGH;
+  } else if (floating) {
+    result = ACS_FAIL_FLOATING;
+  } else if (fabsf(vMean - ACS_VQ_NOMINAL) > ACS_V_IMPOSSIBLE) {
+    // The dryer is an AC load, so its current averages to zero over many cycles
+    // and does NOT move the DC mean. A mean this far from Vq is a wiring fault,
+    // not a measurement - it is safe to call this a hard failure.
+    result = ACS_FAIL_BIAS;
+  } else if (fabsf(vMean - ACS_VQ_NOMINAL) > ACS_VQ_TOL) {
+    result = ACS_WARN_OFF_NOMINAL;
+  } else if (vPkPk > ACS_NOISE_MAX_V) {
+    result = ACS_WARN_NOISY;
+  } else {
+    result = ACS_PASS;
+  }
+
+  if (verbose) {
+    Serial.print(F("  A0 idle bias : "));
+    Serial.print(vMean, 4);
+    Serial.print(F("V (expect "));
+    Serial.print(ACS_VQ_NOMINAL, 3);
+    Serial.print(F("V +/- "));
+    Serial.print(ACS_VQ_TOL, 2);
+    Serial.println(F("V)"));
+
+    Serial.print(F("  Implied Vcc  : "));
+    Serial.print(vMean * 2.0f, 3);
+    Serial.println(F("V   <- sanity-check the 5V sensor rail"));
+
+    Serial.print(F("  Noise pk-pk  : "));
+    Serial.print(vPkPk * 1000.0f, 1);
+    Serial.print(F("mV  (min "));
+    Serial.print(vMin, 4);
+    Serial.print(F("V / max "));
+    Serial.print(vMax, 4);
+    Serial.println(F("V)"));
+
+    Serial.print(F("  Mux drag     : "));
+    if (!dragValid) {
+      Serial.print(F("inconclusive (A1 at "));
+      Serial.print(vRef, 3);
+      Serial.println(F("V is too close to A0)"));
+    } else {
+      Serial.print(drag * 1000.0f, 1);
+      Serial.print(F("mV toward A1@"));
+      Serial.print(vRef, 3);
+      Serial.print(F("V  (trip at "));
+      Serial.print(ACS_FLOAT_DRAG_V * 1000.0f, 0);
+      Serial.println(F("mV)"));
+    }
+
+    Serial.print(F("  RESULT       : "));
+    switch (result) {
+      case ACS_PASS:
+        Serial.println(F("PASS - sensor connected and idle"));
+        break;
+      case ACS_WARN_NOISY:
+        Serial.println(F("WARN - reading is noisy"));
+        Serial.println(F("    Expected if the dryer is powered ON right now."));
+        Serial.println(F("    If the dryer is OFF, suspect a long/unshielded VOUT"));
+        Serial.println(F("    run, a missing filter cap, or ground-loop coupling."));
+        break;
+      case ACS_WARN_OFF_NOMINAL:
+        Serial.println(F("WARN - bias present but off-nominal"));
+        Serial.println(F("    Sensor is connected, but not parked where expected."));
+        Serial.println(F("    Check: 5V rail sagging, a divider on VOUT, DC current"));
+        Serial.println(F("    through the sense conductor, or a UNIdirectional part."));
+        break;
+      case ACS_FAIL_FLOATING:
+        Serial.println(F("FAIL - A0 looks DISCONNECTED (high impedance)"));
+        Serial.println(F("    A0 tracks the neighboring channel instead of holding"));
+        Serial.println(F("    its own voltage. Check the VOUT trace/connector"));
+        Serial.println(F("    between the ACS758 and the ADS1115 A0 pin."));
+        break;
+      case ACS_FAIL_LOW:
+        Serial.println(F("FAIL - A0 is at/near 0V"));
+        Serial.println(F("    No signal reaching the ADC. Check: ACS758 5V supply,"));
+        Serial.println(F("    sensor GND, VOUT shorted to GND, or a solder bridge."));
+        break;
+      case ACS_FAIL_BIAS:
+        Serial.println(F("FAIL - bias present but impossible for a healthy sensor"));
+        Serial.println(F("    An AC load cannot shift the DC mean, so this is a"));
+        Serial.println(F("    wiring fault. SUSPECT #1: J4 plugged in BACKWARDS."));
+        Serial.println(F("    J4 is an unkeyed 3-pin header: 1=+5V 2=GND 3=VOUT."));
+        break;
+      case ACS_FAIL_HIGH:
+        Serial.println(F("FAIL - A0 is pinned at the 3.3V rail"));
+        Serial.println(F("    SUSPECT #1: J4 plugged in BACKWARDS. Reversing an"));
+        Serial.println(F("    unkeyed 3-pin header swaps +5V (pin1) with VOUT"));
+        Serial.println(F("    (pin3), leaving GND on pin2. That un-powers the"));
+        Serial.println(F("    ACS758 and drives +5V into its output pin, which"));
+        Serial.println(F("    back-feeds A0 through the dead chip. UNPLUG NOW -"));
+        Serial.println(F("    R5 protects the ADC, but nothing protects the"));
+        Serial.println(F("    sensor from +5V on its VOUT pin."));
+        Serial.println(F("    Otherwise: VOUT shorted to a rail, or overcurrent."));
+        break;
+    }
+    Serial.println(F("-------------------------------------\n"));
+  }
+
+  return result;
 }
 
 // Add sample to rolling average buffer
@@ -1148,6 +1357,17 @@ void setup() {
   ads.setDataRate(RATE_ADS1115_128SPS);  // 128 samples per second
   Serial.println(F("ADS1115 initialized successfully\n"));
 
+  // Verify the ACS758 is actually wired to the ADC before we trust any reading.
+  // This is advisory: a bad verdict is reported but does not halt the system,
+  // so a false positive can never brick a working dryer.
+  g_acsTestResult = runAcsSelfTest(true);
+  if (g_acsTestResult >= ACS_FAIL_FLOATING) {
+    Serial.println(F("*** ACS758 SELF-TEST FAILED - current readings are NOT trustworthy ***"));
+    Serial.println(F("*** Fix the wiring, then press the button or send 'T' to retest.   ***\n"));
+    setLEDPattern(LED_FAST_FLASH);
+    delayWithFlashing(3000);
+  }
+
   // Load learned thresholds from EEPROM (if available)
   loadThresholdsFromEEPROM();
 
@@ -1163,6 +1383,7 @@ void setup() {
   Serial.println(F("  S or s - Toggle standby mode"));
   Serial.println(F("  L or l - Enter learning mode"));
   Serial.println(F("  N or n - Next (advance learning mode phase)"));
+  Serial.println(F("  T or t - Run ACS758 connectivity self-test"));
   Serial.println(F("  0-180  - Move servo to specified degrees"));
   Serial.println(F("Button:"));
   Serial.println(F("  Short press       - Full recalibration"));
@@ -1332,6 +1553,8 @@ void loop() {
         } else {
           Serial.println(F("Learning already complete."));
         }
+      } else if (ch == 'T' || ch == 't') {
+        g_acsTestResult = runAcsSelfTest(true);
       }
     }
     // Buffer digits for numeric input

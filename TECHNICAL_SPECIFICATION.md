@@ -47,6 +47,28 @@ The SUNLU AMS Heater Auto-Vent Controller is an intelligent automation system de
 - **Output Type**: Analog voltage (ratiometric)
 - **Bandwidth**: DC to 100kHz
 
+#### 2.2.1 J4 "ACS_Conn" Sensor Connector — REVERSAL HAZARD
+
+| J4 Pin | Net | Goes to |
+|--------|-----|---------|
+| 1 | +5V | ACS758 VCC |
+| 2 | GND | ACS758 GND |
+| 3 | VOUT | R5 (1kΩ series) → ADS1115 A0, with C4 (0.1µF) to GND |
+
+**J4 is an unkeyed 1x03 2.54mm vertical pin header — it can be seated backwards.**
+Because GND is the middle pin, a reversal swaps +5V (pin 1) with VOUT (pin 3):
+
+- The ACS758 loses its supply and is no longer powered.
+- **+5V is driven directly into the ACS758's VOUT pin.** R5 limits back-feed into
+  the ADS1115 to roughly 1.4 mA, so the ADC is protected — but **nothing protects
+  the sensor**, and this may damage it. Unplug immediately if the self-test flags it.
+
+The boot-time self-test (`runAcsSelfTest`, or `T` on serial) flags this as
+`ACS_FAIL_HIGH` or `ACS_FAIL_BIAS` and names the flipped connector as the prime
+suspect. **Detection is a backstop, not a fix** — the durable solution is to
+replace J4 with a keyed/shrouded connector (e.g. JST-XH B3B-XH-A) so reversal is
+physically impossible.
+
 ### 2.3 ADC Module
 
 - **Model**: Adafruit ADS1115
@@ -69,23 +91,29 @@ The SUNLU AMS Heater Auto-Vent Controller is an intelligent automation system de
 
 ### 2.5 User Interface
 
-- **LED**: Single status indicator
-  - Type: Standard LED
-  - Configuration: Active low (cathode to GPIO, anode to VCC through resistor)
-  - Pin: D10
+The button and status LED are the two halves of a single integrated part:
+the **Adafruit 3105 Mini Illuminated Momentary Pushbutton (blue power symbol)**.
+It exposes two switch pins and two independent LED pins.
 
-- **Button**: Momentary push button
+- **LED**: Blue status indicator (built into the Adafruit 3105)
+  - Configuration: Active high (GPIO drives LED anode through R6 = 220Ω series resistor, cathode to GND; GPIO HIGH = on)
+  - Pin: D10
+  - Note: blue Vf (~3.0–3.4V) is close to the 3.3V GPIO, so the LED runs at only ~0.5–1.5mA and is on the dim side. This is a voltage-headroom limit, not a resistor issue — 220Ω is the right value for 3.3V (Adafruit's "~1k" rec assumes a 5V+ supply). For a brighter LED, drive it from 5V via a transistor.
+  - Wiring: the LED cathode (pin nearest the "line" half of the power symbol) goes to the GND header pin; anode to the 220Ω/GPIO pin.
+
+- **Button**: Momentary push button (built into the Adafruit 3105)
   - Type: SPST normally-open
-  - Configuration: Active low with internal pullup resistor
+  - Configuration: Active low; MCU internal pull-up enabled, with R1 = 10kΩ in series to the pin
   - Pin: D3
+  - Note: R1 forms a divider with the internal pull-up when pressed (~0.66V at the typical ~40k pull-up = valid LOW). If the button ever reads flaky, drop R1 toward ~1k.
 
 ## 3. Pin Configuration
 
 | Pin | Function | Direction | Configuration |
 |-----|----------|-----------|---------------|
 | D0 | Servo PWM | Output | Push-pull |
-| D3 | Button | Input | Internal pullup, active low |
-| D10 | Status LED | Output | Active low |
+| D3 | Button | Input | Internal pullup + 10kΩ series (R1), active low |
+| D10 | Status LED | Output | Active high, 220Ω series (R6) to GND |
 | SDA | I2C Data | I/O | Open-drain with external pullup |
 | SCL | I2C Clock | Output | Open-drain with external pullup |
 
