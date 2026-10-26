@@ -49,7 +49,7 @@ The system works by monitoring the electrical current drawn by your dryer and le
 - PCB assembly (if not pre-assembled): 1-2 hours
 - 3D printing parts: 4 hours print time
 - Final assembly and installation: 30-60 minutes
-- Initial calibration: 5 minutes
+- Initial calibration: 5 minutes (includes the automatic servo setup on first startup)
 
 ---
 
@@ -73,8 +73,9 @@ The system works by monitoring the electrical current drawn by your dryer and le
 
 2. **Power On**
    - The LED will flash slowly while the system calibrates
-   - After 10 seconds, the LED will turn solid
-   - The system is now ready
+   - On the very first startup, the vent also moves slowly to each end so the controller can find its stops and save the servo travel limits. This adds roughly 20-30 seconds
+   - After that, the LED will turn solid and the system is ready (later startups take about 10 seconds)
+   - If the LED double-blinks instead, the servo setup failed; see [Servo Setup](#servo-setup)
 
 3. **Run Learning Mode** (May be required if vent does not immediately open and close as expected)
    - Make sure your dryer is OFF
@@ -119,6 +120,8 @@ The status LED tells you what the controller is doing:
 | LED Pattern | Meaning |
 |-------------|---------|
 | **SLOW FLASH** | Calibrating servo position |
+| **FAST FLASH** | Servo setup (Auto Find / Jog Mode) in progress |
+| **DOUBLE BLINK** | Servo not set up — the vent won't move until the limits are set (see [Servo Setup](#servo-setup)) |
 
 ---
 
@@ -137,8 +140,8 @@ The single button provides three different functions based on how long you press
 
 **What Happens**:
 - LED flashes slowly
-- Servo moves to test positions
-- Takes about 3 seconds
+- Servo moves to its saved closed and open limits to check the position feedback (if no limits are saved yet, it finds the vent's stops first)
+- Takes about 3 seconds (longer if it has to find the stops)
 - Returns to normal operation
 
 ### Long Press (2-5 seconds)
@@ -586,7 +589,8 @@ Check the GitHub repository for:
 | Solid | Normal operation OR waiting for button press (learning) |
 | Off | Standby mode |
 | Slow flash | Calibrating |
-| Fast flash | Measuring (learning) |
+| Fast flash | Measuring (learning) or servo setup in progress |
+| Double blink | Servo not set up (see Servo Setup) |
 | 3 long blinks | Learning complete! |
 
 ### Learning Mode Quick Steps

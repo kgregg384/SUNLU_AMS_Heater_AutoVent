@@ -85,7 +85,7 @@ physically impossible.
 
 - **Type**: Feedback-enabled servo
 - **Control**: PWM signal (standard servo protocol)
-- **Position Range**: 0° to 180°
+- **Position Range**: 0° to 180° commanded; in operation the servo only moves between the saved CLOSED and OPEN travel limits (see Section 11.1)
 - **Feedback**: Analog voltage proportional to position
 - **Operating Voltage**: 5V (separate power supply recommended)
 
@@ -256,10 +256,10 @@ struct ThresholdData {
 |---------|--------|---------|
 | SOLID | Continuous on | Normal operation / Phase 1 prep |
 | OFF | Continuous off | Standby mode |
-| FAST FLASH | 100ms on/off | Measuring (learning mode) |
+| FAST FLASH | 100ms on/off | Measuring (learning mode), or servo setup (jog / Auto Find) in progress |
 | SLOW FLASH | 250ms on/off | Calibrating servo |
 | BREATHING | 2s cycle fade | Phase 2 prep (turn dryer ON) |
-| DOUBLE BLINK | 2 blinks, pause, repeat | Phase 3 prep (turn heater OFF) |
+| DOUBLE BLINK | 2 blinks, pause, repeat | Servo not set up (no saved travel limits); vent will not move automatically |
 | SUCCESS BLINK | 2 quick flashes | Phase complete |
 | COMPLETE BLINK | 3 long flashes | Learning complete |
 
@@ -289,7 +289,7 @@ struct ThresholdData {
 
 - **Flash**: ~57KB / 256KB (22%)
 - **SRAM**: Estimated ~4KB / 32KB (12%)
-- **EEPROM**: 20 bytes (threshold storage)
+- **EEPROM**: 20 bytes (threshold storage) + 8 bytes (servo travel limits; RP2040 offset 64, SAMD21 separate FlashStorage block)
 
 ## 7. Communication Interfaces
 
@@ -312,7 +312,12 @@ struct ThresholdData {
 | `F` or `f` | Read servo feedback |
 | `S` or `s` | Toggle standby mode |
 | `L` or `l` | Enter learning mode |
-| `0-180` | Move servo to specific angle |
+| `0-180` | Move servo to specific angle (not limited by the travel limits) |
+| `A` or `a` | Servo setup: auto-find the stops |
+| `J` or `j` | Servo setup: jog mode |
+| `?` | Show the command menu |
+
+In setup (jog) mode: `+`/`-` step 1°, `>`/`<` step 5°, `0-180` + Enter go to an angle, `C`/`O` mark the CLOSED/OPEN limit, `W` save and exit, `Q` exit without saving, `A` auto-find, `D` delete saved limits, `F` read feedback, `H`/`?` help. Automatic vent control and the button are paused in setup mode.
 
 ## 8. Power Requirements
 
@@ -341,13 +346,25 @@ struct ThresholdData {
 
 ## 11. Calibration Procedure
 
-### 11.1 Servo Calibration
-Performed automatically at startup:
-1. Move to closed position (180°)
-2. Record feedback voltage
-3. Move to open position (0°)
-4. Record feedback voltage
-5. Create linear mapping between feedback and position
+### 11.1 Servo Travel Limits and Calibration
+
+The servo never drives into the vent's hard stops in normal operation. It moves only between a saved CLOSED and OPEN angle, stored in flash (`ServoLimitsData`, with `HARDWARE_VERSION` in its magic number so v1 limits are ignored by v2 firmware and vice versa).
+
+**Calibration** (startup, short button press, wake from standby, `R`):
+1. If no limits are saved, run Auto Find (below) and save the result
+2. Move to the CLOSED limit and record the feedback voltage
+3. Move to the OPEN limit and record the feedback voltage
+4. Return to CLOSED and create a linear mapping between feedback and position
+
+If no limits can be found, the vent is not moved automatically, `O`/`C` refuse to move it, the LED double-blinks, and the status line shows `SERVO NOT SET UP`.
+
+**Auto Find** (first startup with no saved limits, or the `A` command):
+1. Move to 90° and measure the free-travel feedback slope between 80° and 100°, approaching both from the same direction to take up gear slack. Abort if the slope is below 0.0003 per degree (feedback not following)
+2. From 90°, step 2° every 120ms toward each end. Track how far the shaft lags the command, using the measured slope
+3. A lag above 5° on two consecutive steps is a stop. Return to 90° immediately. If the servo reaches 0° or 180° first, that end has no stop
+4. Pull each limit in from its end by 12.7% of the stop-to-stop travel (`SERVO_STOP_BACKOFF_PCT`)
+
+**Jog mode** (`J`) lets the user set or adjust the limits by hand; see Section 7.3.
 
 ### 11.2 Current Threshold Learning
 See Section 4.5 for detailed algorithm.
@@ -356,6 +373,7 @@ See Section 4.5 for detailed algorithm.
 
 - **ADS1115 Not Found**: System halts with error message
 - **Servo Feedback Out of Range**: Warning message, continues operation
+- **Servo Setup Fails** (feedback not following the servo): Limits not saved, vent not moved automatically, LED double-blinks until limits are set with `A` or `J`
 - **EEPROM Read Invalid**: Uses default thresholds
 - **Button Stuck**: No specific handling (could add timeout)
 

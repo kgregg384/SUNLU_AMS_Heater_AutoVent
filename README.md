@@ -114,7 +114,7 @@ The firmware automatically detects which board it's running on at compile time �
 
 1. Assemble the PCB and 3D printed parts, mount onto your dryer
 2. Connect AC power to the AutoVent and USB-C power to the controller
-3. Wait for the LED to go solid after the 10-second startup calibration
+3. Wait for the LED to go solid. Normal startup calibration takes about 10 seconds; the very first startup also finds the vent's stops and saves the servo travel limits, which adds roughly 20–30 seconds (see [Servo Setup](#servo-setup))
 4. Run **Learning Mode** to teach the controller your dryer's current signature:
    - Ensure dryer is OFF
    - Hold the button for 6–7 seconds to enter learning mode
@@ -138,7 +138,8 @@ See the [User Guide](USER_GUIDE.md) for detailed step-by-step instructions.
 | Solid | Normal operation / waiting for input |
 | Off | Standby mode |
 | Slow flash | Servo calibrating |
-| Fast flash | Measuring (learning mode) |
+| Fast flash | Measuring (learning mode) or servo setup in progress |
+| Double blink | Servo not set up — vent won't move until limits are set (send `A`) |
 | 3 long blinks | Learning complete |
 
 ## Serial Monitor App
