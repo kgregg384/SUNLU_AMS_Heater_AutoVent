@@ -160,6 +160,19 @@ You can also use any serial terminal at 115200 baud. Available commands:
 | `S` / `s` | Toggle standby |
 | `L` / `l` | Enter learning mode |
 | `0`–`180` | Move servo to angle |
+| `A` / `a` | Servo setup — find the stops automatically |
+| `?` | Show the command menu |
+| `J` / `j` | Servo setup — jog by hand to find the stops |
+
+### Servo Setup
+
+On first startup (or any calibration with no saved limits) the controller runs **Auto Find** and saves the result. After that, startup and recalibration only move between the saved limits and never drive the servo into the stops. You can redo or override the limits from the console at any time. If automatic setup fails, the LED double-blinks, the status line shows `SERVO NOT SET UP`, and the vent won't move until you set the limits with `A` or `J`.
+
+**Automatic:** send `A`. The servo moves to mid-travel, measures how the feedback follows it, then creeps toward each end until the feedback stops following (the vent hit a stop). Each limit is pulled in from its stop by about 13% of the measured travel (about 16° on a typical unit). Type either angle and press Enter to check it, then send `W` to save.
+
+**By hand:** send `J`, step with `+`/`-` (1°) or `>`/`<` (5°) until the vent stops moving (a warning prints when the feedback stops following), back off about 10–15°, and send `C` to mark CLOSED. Repeat at the other end with `O`, then send `W`.
+
+`Q` exits without saving, and `D` deletes the saved limits (the next calibration runs Auto Find again). Limits are stored in flash and survive power cycles. Automatic vent control and the button are paused during setup.
 
 ## Documentation
 

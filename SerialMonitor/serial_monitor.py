@@ -133,6 +133,31 @@ class SerialMonitor:
                            command=lambda c=cmd: self.send_command(c))
             btn.pack(side=tk.LEFT, padx=2)
 
+        # Jog mode buttons (find hard stops and save servo travel limits)
+        jog_frame = ttk.Frame(self.root, padding="5")
+        jog_frame.pack(fill=tk.X, padx=10)
+
+        ttk.Label(jog_frame, text="Servo Jog:").pack(side=tk.LEFT, padx=5)
+
+        jog_commands = [
+            ("Auto Find", "A"),
+            ("Jog Mode", "J"),
+            ("-5°", "<"),
+            ("-1°", "-"),
+            ("+1°", "+"),
+            ("+5°", ">"),
+            ("Set Closed", "C"),
+            ("Set Open", "O"),
+            ("Save", "W"),
+            ("Cancel", "Q"),
+            ("Defaults", "D")
+        ]
+
+        for label, cmd in jog_commands:
+            btn = ttk.Button(jog_frame, text=label, width=10,
+                           command=lambda c=cmd: self.send_command(c))
+            btn.pack(side=tk.LEFT, padx=2)
+
         # Manual input
         input_entry_frame = ttk.Frame(self.root, padding="5")
         input_entry_frame.pack(fill=tk.X, padx=10, pady=(0, 5))

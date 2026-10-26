@@ -109,6 +109,20 @@ Use the quick command buttons to send common commands without typing:
 
 - **Feedback** (F): Read current servo position feedback
 
+#### Servo Jog Buttons
+
+Used to find the vent's hard stops and save the servo travel limits (see the main README):
+
+- **Auto Find** (A): Find both stops automatically and mark limits about 13% of the travel short of each (then Save)
+- **Jog Mode** (J): Enter jog mode (pauses automatic vent control)
+- **-5° / -1° / +1° / +5°**: Step the servo
+- **Set Closed** (C) / **Set Open** (O): Mark the current angle as a limit — back off about 10–15° from the stop first
+- **Save** (W): Save both limits and exit jog mode
+- **Cancel** (Q): Exit without saving
+- **Defaults** (D): Delete saved limits and return to the full sweep
+
+While in jog mode, the Open Vent / Close Vent buttons send the same `O` / `C` characters, so they mark limits instead of moving the vent.
+
 #### Manual Input
 
 For advanced commands:

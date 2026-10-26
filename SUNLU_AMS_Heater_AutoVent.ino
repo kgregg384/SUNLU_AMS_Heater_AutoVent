@@ -39,7 +39,7 @@
  */
 
 // Firmware Version (Semantic Versioning)
-#define FIRMWARE_VERSION "2.0.0"
+#define FIRMWARE_VERSION "2.1.0"
 #define FIRMWARE_DATE __DATE__
 #define FIRMWARE_TIME __TIME__
 
@@ -145,6 +145,17 @@ enum AcsTestResult {
 
 AcsTestResult g_acsTestResult = ACS_PASS;
 
+// Default closed/open angles for each hardware version (full servo sweep).
+// Only used for manual moves until the servo travel limits are set up.
+#if HARDWARE_VERSION == 1
+  static const int DEFAULT_CLOSED_DEG = 170;
+  static const int DEFAULT_OPEN_DEG   = 10;
+#else
+  // Physical servo is reversed, so closed is the max angle
+  static const int DEFAULT_CLOSED_DEG = 180;
+  static const int DEFAULT_OPEN_DEG   = 0;
+#endif
+
 // Servo positions in DEGREES (hardware version dependent)
 #if HARDWARE_VERSION == 1
   static int SERVO_CLOSED_DEG = 170;  // Version 1: Closed position
@@ -158,6 +169,32 @@ AcsTestResult g_acsTestResult = ACS_PASS;
 // These map feedback readings to servo positions
 static float g_minFeedback = 0.0f;   // Feedback at closed position
 static float g_maxFeedback = 1.0f;   // Feedback at open position
+
+// Last angle written to the servo (jog mode starts from here)
+static int g_servoDeg = SERVO_CLOSED_DEG;
+
+// User-set travel limits from jog mode (used instead of the hardware defaults when saved)
+bool g_servoLimitsSaved = false;
+int g_savedClosedDeg = 0;
+int g_savedOpenDeg = 0;
+
+// Auto stop-finding settings
+// Each limit is set this fraction of the stop-to-stop travel short of its stop.
+// 12.7% matches a hand-tuned unit: closed stop found at ~126 deg, open end at 0 deg,
+// closed limit set by hand at 110 deg -> 16 / 126.
+static const float SERVO_STOP_BACKOFF_PCT = 12.7f;
+static const float STOP_LAG_DEG = 5.0f;        // Shaft this far behind the command = blocked by a stop
+
+// Feedback change per commanded degree, measured over free travel (0 = unknown)
+float g_fbPerDeg = 0.0f;
+
+// Jog mode state
+bool g_jogMode = false;
+int g_jogClosedDeg = -1;   // Marked but not yet saved (-1 = not marked)
+int g_jogOpenDeg = -1;
+float g_jogLastFb = 0.0f;
+int g_jogLastDir = 0;
+uint8_t g_jogNoMoveCount = 0;
 
 // ----------------- Globals -----------------
 Adafruit_ADS1115 ads;
@@ -259,8 +296,19 @@ struct ThresholdData {
 };
 static const uint32_t EEPROM_MAGIC = 0xABCD1234;
 
+// Servo travel limits, stored separately so saving them never touches the thresholds.
+// HARDWARE_VERSION is part of the magic so limits saved for v1 are ignored by v2 firmware.
+struct ServoLimitsData {
+  uint32_t magic;
+  int16_t closedDeg;
+  int16_t openDeg;
+};
+static const uint32_t SERVO_LIMITS_MAGIC = 0x5E770000UL | HARDWARE_VERSION;
+static const int SERVO_LIMITS_EEPROM_ADDR = 64;  // RP2040: after ThresholdData at 0
+
 #ifdef BOARD_SAMD21
   FlashStorage(thresholdStorage, ThresholdData);
+  FlashStorage(servoLimitsStorage, ServoLimitsData);
 #endif
 
 // ----------------- Helper Functions -----------------
@@ -563,6 +611,7 @@ void calibrateServo() {
   // Return to closed
   Serial.println(F("\nReturning to CLOSED..."));
   servo.write(SERVO_CLOSED_DEG);
+  g_servoDeg = SERVO_CLOSED_DEG;
   delay(500);
 
   servo.detach();
@@ -837,6 +886,7 @@ void moveServo(int degrees) {
   }
 
   servo.write(degrees);
+  g_servoDeg = degrees;
   Serial.print(F("Servo moved to "));
   Serial.print(degrees);
   Serial.println(F(" degrees"));
@@ -848,88 +898,103 @@ void moveServo(int degrees) {
 
 // Close vent
 void closeVent() {
+  if (!g_servoLimitsSaved) {
+    printServoSetupNotice();
+    return;
+  }
   Serial.println(F("CLOSING VENT"));
   moveServo(SERVO_CLOSED_DEG);
 }
 
 // Open vent
 void openVent() {
+  if (!g_servoLimitsSaved) {
+    printServoSetupNotice();
+    return;
+  }
   Serial.println(F("OPENING VENT"));
   moveServo(SERVO_OPEN_DEG);
 }
 
-// Recalibrate servo using Adafruit method
-// Sweeps to find min/max positions, then records feedback at each
-void calibrateFromCurrentPosition() {
-  Serial.println(F("\n========================================"));
-  Serial.println(F("RECALIBRATION (Adafruit method)"));
-  Serial.println(F("========================================"));
+// Set SERVO_CLOSED_DEG / SERVO_OPEN_DEG from the jog-mode limits if saved,
+// otherwise from the hardware-version defaults (full sweep)
+void applyServoLimits() {
+  if (g_servoLimitsSaved) {
+    SERVO_CLOSED_DEG = g_savedClosedDeg;
+    SERVO_OPEN_DEG = g_savedOpenDeg;
+    Serial.println(F("  Using saved travel limits"));
+  } else {
+    SERVO_CLOSED_DEG = DEFAULT_CLOSED_DEG;
+    SERVO_OPEN_DEG = DEFAULT_OPEN_DEG;
+    Serial.print(F("  Hardware Version "));
+    Serial.print(HARDWARE_VERSION);
+    Serial.println(F(" default limits"));
+  }
+  Serial.print(F("  CLOSED position: "));
+  Serial.print(SERVO_CLOSED_DEG);
+  Serial.println(F(" deg"));
+  Serial.print(F("  OPEN position: "));
+  Serial.print(SERVO_OPEN_DEG);
+  Serial.println(F(" deg"));
+}
 
-  float currentFb = readServoFeedback01();
-  Serial.print(F("Current feedback: "));
-  Serial.print(currentFb, 4);
-  Serial.print(F(" (estimated "));
-  Serial.print(feedbackToDeg(currentFb));
-  Serial.println(F(" degrees)"));
+void printServoSetupNotice() {
+  Serial.println(F("\n*** SERVO NOT SET UP - vent will not move automatically ***"));
+  Serial.println(F("*** Send 'A' to find the stops automatically, or 'J' to jog  ***\n"));
+}
 
-  if (!servo.attached()) {
-    servo.attach(SERVO_PWM_PIN);
-    delay(50);
+static void calDelay(uint32_t ms, bool flashLed) {
+  if (flashLed) delayWithFlashing(ms);
+  else delay(ms);
+}
+
+// Record feedback at the saved CLOSED and OPEN limits, then return to closed.
+// Only moves between the saved limits, so the servo never drives into a stop.
+bool calibrateServoFeedback(bool flashLed) {
+  if (!g_servoLimitsSaved) {
+    printServoSetupNotice();
+    return false;
   }
 
-  // Use fixed servo positions (no slow sweep to avoid sticking)
-  Serial.println(F("\nUsing fixed servo positions..."));
-
-  // Set servo positions based on hardware version
-  #if HARDWARE_VERSION == 1
-    SERVO_CLOSED_DEG = 170;  // Version 1: Closed
-    SERVO_OPEN_DEG = 10;     // Version 1: Open
-    Serial.println(F("  Hardware Version 1"));
-    Serial.println(F("  CLOSED position: 170 deg"));
-    Serial.println(F("  OPEN position: 10 deg"));
-  #else
-    // Physical servo is reversed, so we use swapped values
-    SERVO_CLOSED_DEG = 180;  // Version 2: Max position for closed
-    SERVO_OPEN_DEG = 0;      // Version 2: Min position for open
-    Serial.println(F("  Hardware Version 2"));
-    Serial.println(F("  CLOSED position: 180 deg"));
-    Serial.println(F("  OPEN position: 0 deg"));
-  #endif
-
-  // Calibrate feedback at each position
-  Serial.println(F("\nCalibrating feedback..."));
+  applyServoLimits();
+  if (!servo.attached()) {
+    servo.attach(SERVO_PWM_PIN);
+  }
 
   servo.write(SERVO_CLOSED_DEG);
-  delay(1000);
+  calDelay(1000, flashLed);
   g_minFeedback = readServoFeedback01();
   Serial.print(F("  CLOSED ("));
   Serial.print(SERVO_CLOSED_DEG);
-  Serial.print(F("deg): "));
+  Serial.print(F("deg): feedback "));
   Serial.println(g_minFeedback, 4);
 
   servo.write(SERVO_OPEN_DEG);
-  delay(1000);
+  calDelay(1000, flashLed);
   g_maxFeedback = readServoFeedback01();
   Serial.print(F("  OPEN ("));
   Serial.print(SERVO_OPEN_DEG);
-  Serial.print(F("deg): "));
+  Serial.print(F("deg): feedback "));
   Serial.println(g_maxFeedback, 4);
 
-  // Return to closed
-  Serial.println(F("\n========================================"));
-  Serial.print(F("CLOSED: "));
-  Serial.print(SERVO_CLOSED_DEG);
-  Serial.print(F("deg = "));
-  Serial.println(g_minFeedback, 4);
-  Serial.print(F("OPEN:   "));
-  Serial.print(SERVO_OPEN_DEG);
-  Serial.print(F("deg = "));
-  Serial.println(g_maxFeedback, 4);
-  Serial.println(F("========================================\n"));
+  if (fabsf(g_maxFeedback - g_minFeedback) < 0.01f) {
+    Serial.println(F("WARNING: Feedback barely changed between limits - check servo wiring"));
+  }
 
   servo.write(SERVO_CLOSED_DEG);
-  delay(500);
+  g_servoDeg = SERVO_CLOSED_DEG;
+  calDelay(500, flashLed);
   servo.detach();
+  return true;
+}
+
+// Recalibrate servo feedback ('R' command and after jog mode)
+void calibrateFromCurrentPosition() {
+  Serial.println(F("\n========================================"));
+  Serial.println(F("SERVO RECALIBRATION"));
+  Serial.println(F("========================================"));
+  calibrateServoFeedback(false);
+  Serial.println(F("========================================\n"));
 }
 
 // Run full calibration (servo + current offset)
@@ -944,69 +1009,10 @@ void runFullCalibration() {
 
   // === SERVO CALIBRATION ===
   Serial.println(F("\n--- SERVO CALIBRATION ---"));
-
-  g_minFeedback = readServoFeedback01();
-  Serial.print(F("Startup feedback (CLOSED): "));
-  Serial.println(g_minFeedback, 4);
-
-  servo.attach(SERVO_PWM_PIN);
-  delayWithFlashing(100);
-
-  // Use fixed servo positions (no slow sweep to avoid sticking)
-  Serial.println(F("\nUsing fixed servo positions..."));
-
-  // Set servo positions based on hardware version
-  #if HARDWARE_VERSION == 1
-    SERVO_CLOSED_DEG = 170;  // Version 1: Closed
-    SERVO_OPEN_DEG = 10;     // Version 1: Open
-    Serial.println(F("  Hardware Version 1"));
-    Serial.println(F("  CLOSED position: 170 deg"));
-    Serial.println(F("  OPEN position: 10 deg"));
-  #else
-    // Physical servo is reversed, so we use swapped values
-    SERVO_CLOSED_DEG = 180;  // Version 2: Max position for closed
-    SERVO_OPEN_DEG = 0;      // Version 2: Min position for open
-    Serial.println(F("  Hardware Version 2"));
-    Serial.println(F("  CLOSED position: 180 deg"));
-    Serial.println(F("  OPEN position: 0 deg"));
-  #endif
-
-  // Calibrate feedback at each position
-  Serial.println(F("\nCalibrating feedback at each position..."));
-
-  servo.write(SERVO_CLOSED_DEG);
-  delayWithFlashing(1000);
-  g_minFeedback = readServoFeedback01();
-  Serial.print(F("  CLOSED ("));
-  Serial.print(SERVO_CLOSED_DEG);
-  Serial.print(F("deg): "));
-  Serial.println(g_minFeedback, 4);
-
-  servo.write(SERVO_OPEN_DEG);
-  delayWithFlashing(1000);
-  g_maxFeedback = readServoFeedback01();
-  Serial.print(F("  OPEN ("));
-  Serial.print(SERVO_OPEN_DEG);
-  Serial.print(F("deg): "));
-  Serial.println(g_maxFeedback, 4);
-
-  // Print calibration summary
-  Serial.println(F("\nSERVO CALIBRATION COMPLETE"));
-  Serial.print(F("  CLOSED: "));
-  Serial.print(SERVO_CLOSED_DEG);
-  Serial.print(F("deg = "));
-  Serial.print(g_minFeedback, 4);
-  Serial.println(F(" feedback"));
-  Serial.print(F("  OPEN:   "));
-  Serial.print(SERVO_OPEN_DEG);
-  Serial.print(F("deg = "));
-  Serial.print(g_maxFeedback, 4);
-  Serial.println(F(" feedback"));
-
-  // Return to closed position
-  servo.write(SERVO_CLOSED_DEG);
-  delayWithFlashing(500);
-  servo.detach();
+  if (!g_servoLimitsSaved) {
+    autoSetupServo();
+  }
+  calibrateServoFeedback(true);
 
   // === CURRENT OFFSET CALIBRATION ===
   Serial.println(F("\n--- CURRENT OFFSET CALIBRATION ---"));
@@ -1034,7 +1040,8 @@ void runFullCalibration() {
   g_heaterOn = false;
   g_systemActive = false;
 
-  setLEDPattern(LED_SOLID);  // Set LED to solid on after calibration
+  // Solid when ready; double blink means the servo still needs setting up
+  setLEDPattern(g_servoLimitsSaved ? LED_SOLID : LED_DOUBLE_BLINK);
 
   // Allow sensor to settle after calibration
   Serial.println(F("\nAllowing sensor to settle (3 seconds)..."));
@@ -1051,8 +1058,10 @@ void enterStandbyMode() {
   Serial.println(F("ENTERING STANDBY MODE"));
   Serial.println(F("========================================"));
 
-  // Close the vent
-  closeVent();
+  // Close the vent (only if set up - an unset servo is never driven)
+  if (g_servoLimitsSaved) {
+    closeVent();
+  }
   g_ventOpen = false;
   g_ventClosePending = false;
 
@@ -1119,6 +1128,396 @@ void saveThresholdsToEEPROM() {
   Serial.print(F("  Heat ON: ")); Serial.print(HEATER_ON_THRESHOLD, 4); Serial.println(F("A"));
   Serial.print(F("  Heat OFF:")); Serial.print(HEATER_OFF_THRESHOLD, 4); Serial.println(F("A"));
   Serial.println(F("===================================\n"));
+}
+
+// Load servo travel limits saved from jog mode
+bool loadServoLimitsFromEEPROM() {
+  ServoLimitsData data;
+
+  #ifdef BOARD_SAMD21
+    data = servoLimitsStorage.read();
+  #else  // RP2040
+    EEPROM.begin(512);  // Safe to call again; re-reads the same flash sector
+    EEPROM.get(SERVO_LIMITS_EEPROM_ADDR, data);
+  #endif
+
+  if (data.magic == SERVO_LIMITS_MAGIC &&
+      data.closedDeg >= 0 && data.closedDeg <= 180 &&
+      data.openDeg >= 0 && data.openDeg <= 180 &&
+      data.closedDeg != data.openDeg) {
+    g_servoLimitsSaved = true;
+    g_savedClosedDeg = data.closedDeg;
+    g_savedOpenDeg = data.openDeg;
+    Serial.print(F("Loaded servo limits: CLOSED "));
+    Serial.print(g_savedClosedDeg);
+    Serial.print(F(" deg, OPEN "));
+    Serial.print(g_savedOpenDeg);
+    Serial.println(F(" deg"));
+    return true;
+  }
+
+  g_servoLimitsSaved = false;
+  Serial.println(F("No saved servo limits, using hardware defaults"));
+  return false;
+}
+
+// Save servo travel limits (or clear them when valid == false)
+void saveServoLimitsToEEPROM(bool valid) {
+  ServoLimitsData data;
+  data.magic = valid ? SERVO_LIMITS_MAGIC : 0;
+  data.closedDeg = valid ? g_savedClosedDeg : 0;
+  data.openDeg = valid ? g_savedOpenDeg : 0;
+
+  #ifdef BOARD_SAMD21
+    servoLimitsStorage.write(data);
+  #else  // RP2040
+    EEPROM.begin(512);
+    EEPROM.put(SERVO_LIMITS_EEPROM_ADDR, data);
+    EEPROM.commit();
+  #endif
+
+  g_servoLimitsSaved = valid;
+}
+
+// ----------------- Jog Mode -----------------
+// Lets the user step the servo slowly to find each hard stop, back off,
+// and save the extents so normal moves never drive into the stops.
+
+void printJogHelp() {
+  Serial.println(F("Jog commands:"));
+  Serial.println(F("  + / -    Step 1 degree"));
+  Serial.println(F("  > / <    Step 5 degrees"));
+  Serial.println(F("  0-180    Go to angle (then Enter)"));
+  Serial.println(F("  C        Mark current angle as CLOSED limit"));
+  Serial.println(F("  O        Mark current angle as OPEN limit"));
+  Serial.println(F("  W        Write (save) marked limits and exit"));
+  Serial.println(F("  Q        Quit without saving"));
+  Serial.println(F("  A        Auto-find both stops (marks limits ~13% of travel short)"));
+  Serial.println(F("  D        Delete saved limits and exit"));
+  Serial.println(F("  F        Read feedback"));
+  Serial.println(F("  H        Show this help"));
+  Serial.println(F("Jogging by hand: find each stop, then back off 10-15 degrees BEFORE marking it."));
+}
+
+void enterJogMode() {
+  if (g_learningPhase != LEARN_NONE) {
+    Serial.println(F("Finish learning mode before jogging."));
+    return;
+  }
+  if (!g_systemOn) {
+    Serial.println(F("Wake from standby before jogging."));
+    return;
+  }
+
+  g_jogMode = true;
+  g_jogClosedDeg = -1;
+  g_jogOpenDeg = -1;
+  g_jogLastDir = 0;
+  g_jogNoMoveCount = 0;
+  setLEDPattern(LED_FAST_FLASH);
+
+  Serial.println(F("\n========================================"));
+  Serial.println(F("JOG MODE - automatic vent control paused"));
+  Serial.println(F("========================================"));
+  Serial.print(F("Current limits: CLOSED "));
+  Serial.print(SERVO_CLOSED_DEG);
+  Serial.print(F(" deg, OPEN "));
+  Serial.print(SERVO_OPEN_DEG);
+  Serial.println(g_servoLimitsSaved ? F(" deg (saved)") : F(" deg (defaults)"));
+  printJogHelp();
+
+  // Start from mid-travel. The last commanded angle may be past a hard stop
+  // (calibration drives into the stops when no limits are saved), and jogging
+  // from there would hold the servo stalled until it was stepped back far enough.
+  Serial.println(F("Moving to 90 deg (mid-travel) to start..."));
+  if (!servo.attached()) {
+    servo.attach(SERVO_PWM_PIN);
+  }
+  g_servoDeg = 90;
+  servo.write(g_servoDeg);
+  delay(800);
+  measureFreeSlope();  // Ends back at 90 deg
+  g_jogLastFb = readServoFeedback01();
+  Serial.print(F("Jog: "));
+  Serial.print(g_servoDeg);
+  Serial.print(F(" deg | feedback "));
+  Serial.println(g_jogLastFb, 4);
+}
+
+// Move to an absolute angle in jog mode and report whether the servo actually moved
+void jogTo(int deg) {
+  if (deg < 0) deg = 0;
+  if (deg > 180) deg = 180;
+  int delta = deg - g_servoDeg;
+  if (delta == 0) {
+    Serial.println(F("Jog: already at end of servo range"));
+    return;
+  }
+
+  servo.write(deg);
+  g_servoDeg = deg;
+  delay(min(150 + 8 * abs(delta), 1500));  // Small steps settle quickly
+
+  float fb = readServoFeedback01();
+  float dFb = fb - g_jogLastFb;
+  g_jogLastFb = fb;
+
+  Serial.print(F("Jog: "));
+  Serial.print(deg);
+  Serial.print(F(" deg | feedback "));
+  Serial.print(fb, 4);
+  Serial.print(F(" (change "));
+  if (dFb >= 0) Serial.print('+');
+  Serial.print(dFb, 4);
+  Serial.println(F(")"));
+
+  // A feedback servo's pot is on the output shaft, so if the commanded angle
+  // changes but the feedback doesn't, the output is blocked by a stop.
+  // Expected change per degree comes from the last calibration.
+  if (g_fbPerDeg == 0.0f) return;  // Slope unknown - nothing to compare against
+  float expected = fabsf(g_fbPerDeg) * abs(delta);
+
+  int dir = (delta > 0) ? 1 : -1;
+  if (dir != g_jogLastDir) g_jogNoMoveCount = 0;
+  g_jogLastDir = dir;
+
+  if (fabsf(dFb) < 0.35f * expected) {
+    g_jogNoMoveCount++;
+    // One small step can fall inside the servo's deadband, so wait for two
+    if (g_jogNoMoveCount >= 2 || abs(delta) >= 5) {
+      Serial.println(F("!! Feedback is not following - likely AT A STOP. Back off 2-3 deg, then mark."));
+    }
+  } else {
+    g_jogNoMoveCount = 0;
+  }
+}
+
+// Measure feedback change per commanded degree over free mid-travel (70-100 deg).
+// Both readings are approached from the same direction so gear slack doesn't skew them.
+// Leaves the servo at 90 deg.
+bool measureFreeSlope() {
+  servo.write(70);
+  delay(500);
+  servo.write(80);
+  delay(400);
+  float fb80 = readServoFeedback01();
+  servo.write(100);
+  delay(500);
+  float fb100 = readServoFeedback01();
+  servo.write(90);
+  g_servoDeg = 90;
+  delay(400);
+
+  g_fbPerDeg = (fb100 - fb80) / 20.0f;
+  Serial.print(F("Free travel: "));
+  Serial.print(g_fbPerDeg, 5);
+  Serial.println(F(" feedback per deg"));
+  if (fabsf(g_fbPerDeg) < 0.0003f) {
+    g_fbPerDeg = 0.0f;
+    Serial.println(F("WARNING: Feedback not following the servo - stop detection disabled"));
+    return false;
+  }
+  return true;
+}
+
+// Creep from 90 deg in direction dir (+1/-1) until the shaft falls behind the
+// command (blocked by a stop) or the servo runs out of range. Returns the angle
+// the shaft actually stopped at (or the end of servo range), then moves back to 90 deg.
+int findStop(int dir) {
+  // Take up gear slack in the travel direction before taking the reference
+  servo.write(90 - dir * 5);
+  delay(300);
+  servo.write(90);
+  delay(400);
+
+  int deg = 90;
+  int refDeg = 90;                       // Last angle where the shaft was keeping up
+  float refFb = readServoFeedback01();
+  float lagDeg = 0.0f;
+  uint8_t lagCount = 0;
+  bool hitStop = false;
+
+  while (deg + dir * 2 >= 0 && deg + dir * 2 <= 180) {
+    deg += dir * 2;
+    servo.write(deg);
+    delay(120);
+    float fb = readServoFeedback01();
+
+    // How far the shaft is behind where it should be, in degrees
+    float movedDeg = (fb - refFb) / g_fbPerDeg;
+    lagDeg = (float)(deg - refDeg) * dir - movedDeg * dir;
+
+    if (lagDeg > STOP_LAG_DEG) {
+      if (++lagCount >= 2) {
+        hitStop = true;
+        break;
+      }
+    } else {
+      lagCount = 0;
+      if (lagDeg < 1.5f) {
+        refDeg = deg;
+        refFb = fb;
+      }
+    }
+  }
+
+  int stopDeg = hitStop ? deg - dir * (int)(lagDeg + 0.5f) : deg;
+
+  // Unload the stop right away
+  servo.write(90);
+  g_servoDeg = 90;
+  delay(600);
+
+  if (hitStop) {
+    Serial.print(F("  Stop found at about "));
+    Serial.print(stopDeg);
+    Serial.println(F(" deg"));
+  } else {
+    Serial.print(F("  No stop before the end of servo range ("));
+    Serial.print(stopDeg);
+    Serial.println(F(" deg)"));
+  }
+  return stopDeg;
+}
+
+// Find both stops and mark limits SERVO_STOP_BACKOFF_PCT of the travel short of each.
+// Nothing is saved until the user sends W.
+bool autoFindStops() {
+  Serial.println(F("\n--- AUTO-FIND STOPS ---"));
+  if (g_fbPerDeg == 0.0f && !measureFreeSlope()) {
+    Serial.println(F("Auto-find needs working feedback. Jog by hand instead."));
+    return false;
+  }
+
+  int closedDir = (DEFAULT_CLOSED_DEG > DEFAULT_OPEN_DEG) ? 1 : -1;
+  Serial.println(F("Finding CLOSED stop..."));
+  int closedStop = findStop(closedDir);
+  Serial.println(F("Finding OPEN stop..."));
+  int openStop = findStop(-closedDir);
+  g_jogLastFb = readServoFeedback01();
+
+  // Pull each limit in toward the middle by the same share of the travel
+  int travel = abs(closedStop - openStop);
+  int backoff = (int)(travel * SERVO_STOP_BACKOFF_PCT / 100.0f + 0.5f);
+  g_jogClosedDeg = closedStop - closedDir * backoff;
+  g_jogOpenDeg = openStop + closedDir * backoff;
+  Serial.print(F("Travel "));
+  Serial.print(travel);
+  Serial.print(F(" deg, backing off "));
+  Serial.print(backoff);
+  Serial.print(F(" deg ("));
+  Serial.print(SERVO_STOP_BACKOFF_PCT, 1);
+  Serial.println(F("%) from each end"));
+
+  Serial.print(F("\nMarked CLOSED "));
+  Serial.print(g_jogClosedDeg);
+  Serial.print(F(" deg, OPEN "));
+  Serial.print(g_jogOpenDeg);
+  Serial.println(F(" deg (not saved yet)"));
+  if (g_jogMode) {
+    Serial.println(F("Check them by typing either angle + Enter. Adjust with jog + C/O if needed."));
+    Serial.println(F("W to save, Q to cancel."));
+  }
+  return abs(g_jogOpenDeg - g_jogClosedDeg) >= 10;
+}
+
+// First-time setup when no limits are saved: find the stops and save them.
+// The user can redo this later with A, set them by hand with J, or delete them with D.
+bool autoSetupServo() {
+  Serial.println(F("No saved servo limits - running automatic setup"));
+  if (!servo.attached()) {
+    servo.attach(SERVO_PWM_PIN);
+  }
+  servo.write(90);
+  g_servoDeg = 90;
+  delay(800);
+
+  if (!measureFreeSlope() || !autoFindStops()) {
+    servo.detach();
+    Serial.println(F("Automatic setup failed - set the limits from the console (A or J)"));
+    return false;
+  }
+
+  g_savedClosedDeg = g_jogClosedDeg;
+  g_savedOpenDeg = g_jogOpenDeg;
+  saveServoLimitsToEEPROM(true);
+  Serial.print(F("Saved servo limits: CLOSED "));
+  Serial.print(g_savedClosedDeg);
+  Serial.print(F(" deg, OPEN "));
+  Serial.print(g_savedOpenDeg);
+  Serial.println(F(" deg"));
+  return true;
+}
+
+void markJogLimit(bool closed) {
+  if (closed) g_jogClosedDeg = g_servoDeg;
+  else g_jogOpenDeg = g_servoDeg;
+  Serial.print(closed ? F("CLOSED") : F("OPEN"));
+  Serial.print(F(" limit marked at "));
+  Serial.print(g_servoDeg);
+  Serial.println(F(" deg (not saved yet - W to save)"));
+}
+
+// Leave jog mode, then recalibrate feedback at whichever limits are now active
+void exitJogMode() {
+  g_jogMode = false;
+  servo.detach();
+  calibrateFromCurrentPosition();  // Moves closed -> open -> closed using the active limits
+  g_ventOpen = false;
+  g_ventClosePending = false;
+  setLEDPattern(g_servoLimitsSaved ? LED_SOLID : LED_DOUBLE_BLINK);
+  Serial.println(F("Jog mode ended - automatic vent control resumed\n"));
+}
+
+void saveJogLimitsAndExit() {
+  if (g_jogClosedDeg < 0 || g_jogOpenDeg < 0) {
+    Serial.println(F("Mark both CLOSED (C) and OPEN (O) before saving."));
+    return;
+  }
+  if (abs(g_jogOpenDeg - g_jogClosedDeg) < 10) {
+    Serial.println(F("CLOSED and OPEN must be at least 10 degrees apart."));
+    return;
+  }
+
+  g_savedClosedDeg = g_jogClosedDeg;
+  g_savedOpenDeg = g_jogOpenDeg;
+  saveServoLimitsToEEPROM(true);
+  Serial.print(F("\nSaved servo limits: CLOSED "));
+  Serial.print(g_savedClosedDeg);
+  Serial.print(F(" deg, OPEN "));
+  Serial.print(g_savedOpenDeg);
+  Serial.println(F(" deg"));
+  exitJogMode();
+}
+
+void handleJogCommand(char ch) {
+  switch (ch) {
+    case '+': case '=': jogTo(g_servoDeg + 1); break;
+    case '-': case '_': jogTo(g_servoDeg - 1); break;
+    case '>': case '.': jogTo(g_servoDeg + 5); break;
+    case '<': case ',': jogTo(g_servoDeg - 5); break;
+    case 'C': case 'c': markJogLimit(true); break;
+    case 'O': case 'o': markJogLimit(false); break;
+    case 'W': case 'w': saveJogLimitsAndExit(); break;
+    case 'Q': case 'q':
+      Serial.println(F("\nJog cancelled - limits unchanged"));
+      exitJogMode();
+      break;
+    case 'A': case 'a': autoFindStops(); break;
+    case 'D': case 'd':
+      saveServoLimitsToEEPROM(false);
+      Serial.println(F("\nSaved limits deleted - using hardware defaults"));
+      exitJogMode();
+      break;
+    case 'F': case 'f':
+      Serial.print(F("Jog: "));
+      Serial.print(g_servoDeg);
+      Serial.print(F(" deg | feedback "));
+      Serial.println(readServoFeedback01(), 4);
+      break;
+    case 'H': case 'h': case '?': printJogHelp(); break;
+    default: break;  // Ignore stray characters (spaces, etc.)
+  }
 }
 
 // Start learning mode
@@ -1287,6 +1686,28 @@ void handleLearningButtonPress() {
   }
 }
 
+// Print the serial command menu (at startup and on '?')
+void printCommandMenu() {
+  Serial.println(F("Serial Commands:"));
+  Serial.println(F("  O or o - Open vent"));
+  Serial.println(F("  C or c - Close vent"));
+  Serial.println(F("  R or r - Recalibrate servo only"));
+  Serial.println(F("  F or f - Read current feedback (no movement)"));
+  Serial.println(F("  S or s - Toggle standby mode"));
+  Serial.println(F("  L or l - Enter learning mode"));
+  Serial.println(F("  N or n - Next (advance learning mode phase)"));
+  Serial.println(F("  T or t - Run ACS758 connectivity self-test"));
+  Serial.println(F("  0-180  - Move servo to specified degrees"));
+  Serial.println(F("  A or a - Servo setup: auto-find the stops (then W to save)"));
+  Serial.println(F("  J or j - Servo setup: jog by hand to find the stops"));
+  Serial.println(F("  ?      - Show this menu"));
+  Serial.println(F("Button:"));
+  Serial.println(F("  Short press       - Full recalibration"));
+  Serial.println(F("  Long press 2s     - Toggle standby/wake"));
+  Serial.println(F("  Very long press 5s - Enter learning mode"));
+  Serial.println(F("========================================\n"));
+}
+
 // ----------------- Setup -----------------
 void setup() {
   // Initialize LED and button pins first
@@ -1371,28 +1792,16 @@ void setup() {
   // Load learned thresholds from EEPROM (if available)
   loadThresholdsFromEEPROM();
 
+  // Load servo travel limits set in jog mode (if available)
+  loadServoLimitsFromEEPROM();
+
   // Run full calibration (servo + current offset)
   runFullCalibration();
 
-  // Print available commands
-  Serial.println(F("Serial Commands:"));
-  Serial.println(F("  O or o - Open vent"));
-  Serial.println(F("  C or c - Close vent"));
-  Serial.println(F("  R or r - Recalibrate servo only"));
-  Serial.println(F("  F or f - Read current feedback (no movement)"));
-  Serial.println(F("  S or s - Toggle standby mode"));
-  Serial.println(F("  L or l - Enter learning mode"));
-  Serial.println(F("  N or n - Next (advance learning mode phase)"));
-  Serial.println(F("  T or t - Run ACS758 connectivity self-test"));
-  Serial.println(F("  0-180  - Move servo to specified degrees"));
-  Serial.println(F("Button:"));
-  Serial.println(F("  Short press       - Full recalibration"));
-  Serial.println(F("  Long press 2s     - Toggle standby/wake"));
-  Serial.println(F("  Very long press 5s - Enter learning mode"));
-  Serial.println(F("========================================\n"));
+  printCommandMenu();
 
   g_lastUpdateMs = millis();
-  setLEDPattern(LED_SOLID);
+  setLEDPattern(g_servoLimitsSaved ? LED_SOLID : LED_DOUBLE_BLINK);
 }
 
 // ----------------- Loop -----------------
@@ -1402,6 +1811,7 @@ void loop() {
 
   // Check for button press FIRST (before learning mode processing)
   bool currentButtonState = digitalRead(BUTTON_PIN);
+  if (g_jogMode) currentButtonState = g_lastButtonState;  // Button is ignored while jogging
 
   // Button just pressed - start timing
   if (currentButtonState == LOW && g_lastButtonState == HIGH) {
@@ -1499,16 +1909,20 @@ void loop() {
         if (isNumber) {
           int degrees = atoi(g_serialBuffer);
           if (degrees >= 0 && degrees <= 180) {
-            Serial.print(F("Moving to "));
-            Serial.print(degrees);
-            Serial.println(F(" degrees..."));
-            moveServo(degrees);
+            if (g_jogMode) {
+              jogTo(degrees);  // Servo stays attached and reports feedback
+            } else {
+              Serial.print(F("Moving to "));
+              Serial.print(degrees);
+              Serial.println(F(" degrees..."));
+              moveServo(degrees);
 
-            // Read and display feedback at new position
-            delay(100);
-            float fb = readServoFeedback01();
-            Serial.print(F("Feedback at position: "));
-            Serial.println(fb, 4);
+              // Read and display feedback at new position
+              delay(100);
+              float fb = readServoFeedback01();
+              Serial.print(F("Feedback at position: "));
+              Serial.println(fb, 4);
+            }
           } else {
             Serial.println(F("Invalid degrees (use 0-180)"));
           }
@@ -1518,7 +1932,16 @@ void loop() {
     }
     // Handle single character commands immediately
     else if (g_serialIdx == 0 && !isdigit(ch)) {
-      if (ch == 'O' || ch == 'o') {
+      if (g_jogMode) {
+        handleJogCommand(ch);
+      } else if (ch == '?') {
+        printCommandMenu();
+      } else if (ch == 'J' || ch == 'j') {
+        enterJogMode();
+      } else if (ch == 'A' || ch == 'a') {
+        enterJogMode();
+        if (g_jogMode) autoFindStops();
+      } else if (ch == 'O' || ch == 'o') {
         openVent();
       } else if (ch == 'C' || ch == 'c') {
         closeVent();
@@ -1561,6 +1984,12 @@ void loop() {
     else if (isdigit(ch) && g_serialIdx < sizeof(g_serialBuffer) - 1) {
       g_serialBuffer[g_serialIdx++] = ch;
     }
+  }
+
+  // Jog mode pauses all automatic control
+  if (g_jogMode) {
+    updateLEDPattern();
+    return;
   }
 
   // Handle learning mode processing (if active)
@@ -1636,7 +2065,9 @@ void loop() {
     Serial.print(F(" Irms="));
     Serial.println(Irms, 4);
 
-    if (g_heaterOn && !g_ventOpen) {
+    if (!g_servoLimitsSaved) {
+      // Servo travel limits not set up yet - never drive the vent automatically
+    } else if (g_heaterOn && !g_ventOpen) {
       // Heater is ON and vent is closed - open it, cancel any pending close
       g_ventClosePending = false;
       Serial.println(F(">>> HEATER ON - Opening vent"));
@@ -1691,6 +2122,9 @@ void loop() {
       Serial.print(g_heaterOn ? F("ON ") : F("OFF"));
       Serial.print(F(" | Vent: "));
       Serial.print(g_ventOpen ? F("OPEN") : F("CLOSED"));
+      if (!g_servoLimitsSaved) {
+        Serial.print(F(" | SERVO NOT SET UP (send A)"));
+      }
       if (g_ventClosePending) {
         uint32_t remaining = (VENT_CLOSE_DELAY_MS - (now - g_ventCloseDelayStart)) / 1000;
         Serial.print(F(" ("));

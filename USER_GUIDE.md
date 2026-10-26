@@ -319,6 +319,19 @@ While the system is designed for fully automatic operation, you can:
 - **Disable temporarily**: Press button for 2-5 seconds (standby mode)
 - **Recalibrate**: Short press if vent isn't moving correctly
 - **Relearn**: Very long press (5+ seconds) if behavior changes
+- **Set servo travel limits**: Use Auto Find or Jog Mode from the Serial Monitor app (below)
+
+### Servo Setup
+
+On first startup the controller finds the vent's stops automatically and saves the servo's travel limits. You only need this section to redo or adjust them. If the automatic setup fails, the LED double-blinks and the vent won't move until you set the limits here. Setting limits stops the servo just short of each of the vent's hard stops, so it never stalls at the ends.
+
+1. Connect the Serial Monitor app and click **Auto Find**. The vent moves to the middle, then slowly to each end until it stops, and the app shows the CLOSED and OPEN limits it found (each set back from its stop by about 13% of the travel).
+2. To check a limit, type its angle in the Send box and press Enter. The vent should be nearly fully closed (or open) without straining.
+3. Click **Save**. The controller checks the new limits and returns to automatic control.
+
+If Auto Find gets a limit wrong, click **Jog Mode** instead and set them by hand: use **+1° / -1°** (or **+5° / -5°**) to move toward the closed end until the vent stops moving, step back about 10-15°, click **Set Closed**, do the same at the open end with **Set Open**, then click **Save**.
+
+Click **Cancel** to leave without changing anything, or **Defaults** to delete saved limits (the next calibration runs Auto Find again). Saved limits survive power loss.
 
 ---
 
