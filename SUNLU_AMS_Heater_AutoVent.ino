@@ -561,63 +561,6 @@ float degToFeedback(int deg) {
   return g_minFeedback + t * (g_maxFeedback - g_minFeedback);
 }
 
-// Calibrate servo feedback at two positions (Adafruit method)
-void calibrateServo() {
-  Serial.println(F("\n========================================"));
-  Serial.println(F("SERVO CALIBRATION (Adafruit method)"));
-  Serial.println(F("========================================"));
-
-  servo.attach(SERVO_PWM_PIN);
-  Serial.println(F("Servo ttached"));
-  delay(100);
-
-  // Step 1: Go to closed position and read feedback
-  Serial.println(F("\nStep 1: Reading CLOSED position feedback..."));
-  servo.write(SERVO_CLOSED_DEG);
-  delay(1000);  // Wait for servo to settle
-  g_minFeedback = readServoFeedback01();
-  Serial.print(F("  CLOSED ("));
-  Serial.print(SERVO_CLOSED_DEG);
-  Serial.print(F("deg): feedback = "));
-  Serial.println(g_minFeedback, 4);
-
-  // Step 2: Move to open position and read feedback
-  Serial.println(F("\nStep 2: Moving to OPEN position..."));
-  servo.write(SERVO_OPEN_DEG);
-  delay(1000);  // Wait for servo to settle
-  g_maxFeedback = readServoFeedback01();
-  Serial.print(F("  OPEN ("));
-  Serial.print(SERVO_OPEN_DEG);
-  Serial.print(F("deg): feedback = "));
-  Serial.println(g_maxFeedback, 4);
-
-  // Verify the mapping makes sense
-  if (g_maxFeedback <= g_minFeedback + 0.05f) {
-    Serial.println(F("WARNING: Feedback range too small!"));
-  }
-
-  // Print the mapping
-  Serial.println(F("\nCalibration complete:"));
-  Serial.print(F("  "));
-  Serial.print(SERVO_CLOSED_DEG);
-  Serial.print(F("deg (closed) = "));
-  Serial.print(g_minFeedback, 4);
-  Serial.print(F(" feedback\n  "));
-  Serial.print(SERVO_OPEN_DEG);
-  Serial.print(F("deg (open)   = "));
-  Serial.print(g_maxFeedback, 4);
-  Serial.println(F(" feedback"));
-
-  // Return to closed
-  Serial.println(F("\nReturning to CLOSED..."));
-  servo.write(SERVO_CLOSED_DEG);
-  g_servoDeg = SERVO_CLOSED_DEG;
-  delay(500);
-
-  servo.detach();
-  Serial.println(F("========================================\n"));
-}
-
 // Measure RMS current over a time period using Welford's online algorithm
 float measureIrmsOver(uint32_t ms) {
   uint32_t t0 = millis();
