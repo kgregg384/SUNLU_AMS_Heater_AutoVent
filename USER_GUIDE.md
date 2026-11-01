@@ -450,6 +450,7 @@ Click **Cancel** to leave without changing anything, or **Defaults** to delete s
    - Remove dust and debris from vent
    - Ensure smooth movement
    - Lubricate vent hinges if needed (dry lube only)
+   - A light coat of PTFE spray on the gaskets keeps the vent sliding smoothly
 
 3. **Check Connections**
    - Verify all wires secure

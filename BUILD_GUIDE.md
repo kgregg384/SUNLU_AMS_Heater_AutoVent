@@ -63,7 +63,7 @@ Lay everything out before you start so you're not hunting for parts mid-solder.
 | 2 | 7-pin Headers | XIAO |
 | 1 | 10-pin Header | ADS1115 |
 | 1 | 4-pin straight header | On the ACS758 module |
-| 1 | 3-pin straight header | ACS758 connection on the main PCB (latest PCB; the board in the video uses a 3-pin right-angle header) |
+| 1 | 3-pin straight header | ACS758 connection on the main PCB |
 | 2 | 2-pin Dupont headers | Main PCB: pushbutton and LED |
 | 1 | 4-pin straight header | Servo |
 | 1 | 2.54mm 2-Position Screw Terminal | PCB 5V power input |
@@ -71,7 +71,7 @@ Lay everything out before you start so you're not hunting for parts mid-solder.
 | — | 22 AWG hookup wire | Leads for the 5V socket |
 | — | Leads with Dupont connectors | Soldered to the pushbutton and LED; the connector end plugs onto the PCB's 2-pin headers |
 
-> **The BOM's header list is out of date.** It shows right-angle headers for the ACS758 and the servo. The latest PCB uses **straight headers throughout**: a 4-pin on the ACS758 module, a 3-pin for the ACS758 on the main PCB and a 4-pin for the servo, as listed above.
+> **The BOM's header list is out of date.** All headers are **straight**: a 4-pin on the ACS758 module, a 3-pin for the ACS758 on the main PCB and a 4-pin for the servo, as listed above.
 
 **Not included in the kit**
 
@@ -130,7 +130,7 @@ The main PCB gets these connector headers:
 | 4-pin straight | Right side | Servo |
 | 3-pin straight | Bottom | ACS758 current sensor (J4) |
 
-The board in the video is an earlier revision with **right-angle** headers for the ACS758 and the servo. The latest PCB uses **straight** headers for both. Go by the silkscreen on your board.
+All headers are straight. Go by the silkscreen on your board.
 
 > **Option:** instead of a header and cable, you can solder the ACS758 module directly to the PCB with wire leads. See [ACS758 connections](#acs758-connections).
 
@@ -305,6 +305,8 @@ Use **at least 18 AWG** wire anywhere AC current flows, including the path throu
    ![Fitting the vent base](docs/images/build-guide/22-base-gasket.jpg)
 
 3. **Fit the vent cover** with its TPU gasket installed. It should have a little resistance but still slide easily.
+
+   > **Tip:** a light coat of PTFE spray on the gaskets helps the vent slide smoothly. Let it dry before fitting the cover.
 
    ![Vent cover with TPU gasket](docs/images/build-guide/23-vent-cover.jpg)
 
