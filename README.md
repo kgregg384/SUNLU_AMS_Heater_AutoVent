@@ -35,9 +35,10 @@ A self-learning calibration mode lets the controller adapt to your specific drye
 | Current Sensor | ACS758 LCB-050B | AC current measurement (±50A) |
 | ADC | ADS1115 | 16-bit I2C analog-to-digital converter |
 | Servo | Feedback-enabled servo | Vent actuation with position feedback |
+| Button + LED | Mini illuminated pushbutton (Adafruit 3104 or 3105) | Button and status LED in one part; series resistors are on the PCB |
 | PCB | Custom (from [3dcreator.shop](https://3dcreator.shop)) | Bare board or kit with components |
 
-You'll also need a momentary push button, an LED with resistor, a USB-C cable, and a 5V 1A+ power source.
+You'll also need a 5V power source rated over 1A (barrel jack, or a quality 2A USB-C adapter into the XIAO). The full parts list is in the [Build Guide](BUILD_GUIDE.md).
 
 ### Pin Configuration
 
