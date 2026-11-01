@@ -140,7 +140,13 @@ The board in the video is an earlier revision with a **right-angle** 3-pin heade
 
 ![Soldering the connector headers](docs/images/build-guide/08-pcb-headers.jpg)
 
-> **On the board in the video, the 3-pin ACS758 header uses the left three holes.** Leave the fourth hole on the right empty.
+> **On the board in the video, the 3-pin ACS758 header uses the left three holes.** Leave the fourth hole on the right empty. The Rev 2.0 board has only three holes there.
+
+### Connection map
+
+Every connector on the Rev 2.0 PCB and what plugs into it. Square pads are pin 1. Keep this handy for the wiring in sections 5 and 8.
+
+![PCB Rev 2.0 connection map](docs/images/build-guide/diagram-pcb-connections.svg)
 
 ---
 
@@ -247,7 +253,7 @@ Use **at least 18 AWG** wire anywhere AC current flows, including the path throu
 
    ![Soldering the AC connections](docs/images/build-guide/17-ac-plug-solder.jpg)
 
-2. **Feed the C7 cable in through the power opening** and tie a **strain-relief knot** just inside the wall so a pull on the cord can't reach the solder joints or terminals. Don't forget to connect the **ground** conductor (the video adds it at 17:38).
+2. **Feed the C7 cable in through the power opening** and tie a **strain-relief knot** just inside the wall so a pull on the cord can't reach the solder joints or terminals. The C7 cable and C8 inlet are two-conductor, so there is no ground wire to connect.
 
    ![AC cord through the enclosure wall](docs/images/build-guide/18-ac-cord-entry.jpg)
 
@@ -257,6 +263,8 @@ Use **at least 18 AWG** wire anywhere AC current flows, including the path throu
    - The other conductor runs **straight through** from the C8 inlet to the C7 cable (it doesn't touch the sensor)
 
    Only one conductor passes through the sensor. If both did, their currents would cancel and the controller would read nothing.
+
+   ![AC wiring diagram](docs/images/build-guide/diagram-ac-wiring.svg)
 
    ![AC wiring finished](docs/images/build-guide/19-ac-wiring.jpg)
 
@@ -274,7 +282,7 @@ Use **at least 18 AWG** wire anywhere AC current flows, including the path throu
 
    > ⚠️ **J4 is unkeyed and can be plugged in backwards.** GND is the middle pin, so a reversal swaps 5V with the sensor output. That un-powers the ACS758 and drives 5V into its output pin, which can damage it. Check this connection twice. The boot-time self-test flags a reversed connector (see [Technical Specification §2.2.1](TECHNICAL_SPECIFICATION.md#221-j4-acs_conn-sensor-connector--reversal-hazard)), but don't rely on it.
 
-3. **Install the 5V DC socket** (skip this if you're powering over USB-C). Push it through its hole, put the nut on and tighten. Connect its leads to the main board's 2.54mm 2-position screw terminal (PCB power input). Seen from the angle in the video, **ground is on top and 5V is on the bottom**, but go by the board's silkscreen if it differs.
+3. **Install the 5V DC socket** (skip this if you're powering over USB-C). Push it through its hole, put the nut on and tighten. Connect its leads to the main board's 2.54mm 2-position screw terminal (5V IN): **red (+) to pin 1, +5V (square pad)**, and **black (−) to pin 2, GND**. With the board mounted in the enclosure as in the video, that puts ground on top and 5V on the bottom. See the [connection map](#connection-map).
 
 4. **Connect the servo** to the 4-pin right-angle header, checking that signal, power and ground line up with the silkscreen. Connect the **button** and **LED** leads to their headers. The kit's **data cable with ferrite core** carries the servo feedback signal; install it with the ferrite core in place.
 

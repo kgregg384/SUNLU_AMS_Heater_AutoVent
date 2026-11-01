@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 470" font-family="Helvetica, Arial, sans-serif">
+  <rect width="1000" height="470" fill="#ffffff"/>
+  <text x="500" y="30" text-anchor="middle" font-size="20" font-weight="bold" fill="#1a1a1a">AC wiring: one conductor runs through the ACS758</text>
+
+  <!-- Enclosure -->
+  <rect x="210" y="60" width="560" height="340" rx="12" fill="#f4f6f8" stroke="#5b6670" stroke-width="2" stroke-dasharray="8 6"/>
+  <text x="490" y="85" text-anchor="middle" font-size="14" fill="#5b6670">Inside the AutoVent enclosure</text>
+
+  <!-- Wall side -->
+  <rect x="20" y="170" width="160" height="100" rx="8" fill="#ffffff" stroke="#1a1a1a" stroke-width="2"/>
+  <text x="100" y="205" text-anchor="middle" font-size="15" font-weight="bold" fill="#1a1a1a">Wall power</text>
+  <text x="100" y="227" text-anchor="middle" font-size="13" fill="#333">heater's original</text>
+  <text x="100" y="245" text-anchor="middle" font-size="13" fill="#333">power cord</text>
+  <path d="M180 220 H210" stroke="#1a1a1a" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <!-- C8 inlet -->
+  <rect x="210" y="160" width="80" height="120" rx="6" fill="#2b2b2b"/>
+  <text x="250" y="150" text-anchor="middle" font-size="14" font-weight="bold" fill="#1a1a1a">C8 inlet</text>
+  <circle cx="290" cy="190" r="7" fill="#d9b45a" stroke="#8a6d1f" stroke-width="2"/>
+  <circle cx="290" cy="250" r="7" fill="#d9b45a" stroke="#8a6d1f" stroke-width="2"/>
+
+  <!-- ACS758 module -->
+  <rect x="400" y="110" width="190" height="120" rx="8" fill="#3b3f9e"/>
+  <text x="495" y="160" text-anchor="middle" font-size="16" font-weight="bold" fill="#ffffff">ACS758</text>
+  <text x="495" y="182" text-anchor="middle" font-size="12" fill="#dfe2ff">5mm screw terminal</text>
+  <rect x="405" y="200" width="40" height="26" rx="3" fill="#2e9b57"/>
+  <rect x="545" y="200" width="40" height="26" rx="3" fill="#2e9b57"/>
+  <text x="425" y="250" text-anchor="middle" font-size="15" font-weight="bold" fill="#1a1a1a">IP−</text>
+  <text x="565" y="250" text-anchor="middle" font-size="15" font-weight="bold" fill="#1a1a1a">IP+</text>
+
+  <!-- C7 cable exit -->
+  <rect x="700" y="160" width="70" height="120" rx="6" fill="#ffffff" stroke="#1a1a1a" stroke-width="2"/>
+  <text x="735" y="215" text-anchor="middle" font-size="12" fill="#1a1a1a">strain-</text>
+  <text x="735" y="231" text-anchor="middle" font-size="12" fill="#1a1a1a">relief</text>
+  <text x="735" y="247" text-anchor="middle" font-size="12" fill="#1a1a1a">knot</text>
+  <circle cx="700" cy="190" r="7" fill="#d9b45a" stroke="#8a6d1f" stroke-width="2"/>
+  <circle cx="700" cy="250" r="7" fill="#d9b45a" stroke="#8a6d1f" stroke-width="2"/>
+  <path d="M770 220 H820" stroke="#1a1a1a" stroke-width="3" marker-end="url(#arrow)"/>
+  <rect x="820" y="170" width="160" height="100" rx="8" fill="#ffffff" stroke="#1a1a1a" stroke-width="2"/>
+  <text x="900" y="205" text-anchor="middle" font-size="15" font-weight="bold" fill="#1a1a1a">To the heater</text>
+  <text x="900" y="227" text-anchor="middle" font-size="13" fill="#333">C7 cable plugs into</text>
+  <text x="900" y="245" text-anchor="middle" font-size="13" fill="#333">the heater's socket</text>
+
+  <!-- Conductor A: through the sensor -->
+  <path d="M297 190 H360 V213 H405" fill="none" stroke="#c0392b" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M585 213 H640 V190 H693" fill="none" stroke="#c0392b" stroke-width="5" stroke-linejoin="round"/>
+  <text x="330" y="182" text-anchor="middle" font-size="13" fill="#c0392b" font-weight="bold">conductor A</text>
+  <text x="650" y="182" text-anchor="middle" font-size="13" fill="#c0392b" font-weight="bold">conductor A</text>
+
+  <!-- Conductor B: straight through -->
+  <path d="M297 250 V250 H360 V320 H640 V250 H693" fill="none" stroke="#1a1a1a" stroke-width="5" stroke-linejoin="round"/>
+  <text x="500" y="345" text-anchor="middle" font-size="14" fill="#1a1a1a" font-weight="bold">conductor B: straight through, does not touch the sensor</text>
+
+  <text x="500" y="380" text-anchor="middle" font-size="13" fill="#333">Use 18 AWG or heavier for every AC connection. Insulate all joints.</text>
+
+  <text x="500" y="440" text-anchor="middle" font-size="14" fill="#a12a1f" font-weight="bold">Only ONE conductor goes through IP− / IP+. If both did, the currents would cancel and the sensor would read zero.</text>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#1a1a1a"/>
+    </marker>
+  </defs>
+</svg>

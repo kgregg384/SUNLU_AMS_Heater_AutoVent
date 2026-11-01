@@ -1,0 +1,171 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 820" font-family="Helvetica, Arial, sans-serif">
+  <rect width="1000" height="820" fill="#ffffff"/>
+  <text x="500" y="28" text-anchor="middle" font-size="20" font-weight="bold" fill="#1a1a1a">AutoVent PCB Rev 2.0: connections (top view)</text>
+
+  <defs>
+    <style>
+      .pad { fill: #d9b45a; stroke: #8a6d1f; stroke-width: 2; }
+      .silk { fill: #ffffff; font-size: 13px; }
+      .silkb { fill: #ffffff; font-size: 14px; font-weight: bold; }
+      .box { fill: #ffffff; stroke: #1a1a1a; stroke-width: 2; }
+      .lbl { fill: #1a1a1a; font-size: 13px; }
+      .lblb { fill: #1a1a1a; font-size: 15px; font-weight: bold; }
+      .v5 { stroke: #c0392b; stroke-width: 3; fill: none; }
+      .gnd { stroke: #1a1a1a; stroke-width: 3; fill: none; }
+      .sig { stroke: #d4a017; stroke-width: 3; fill: none; }
+      .fb { stroke: #2e86c1; stroke-width: 3; fill: none; }
+    </style>
+  </defs>
+
+  <!-- Board -->
+  <rect x="220" y="50" width="470" height="600" rx="14" fill="#2e7d4f" stroke="#1b4d30" stroke-width="3"/>
+
+  <!-- XIAO -->
+  <rect x="340" y="75" width="200" height="225" rx="8" fill="#3a3a3a"/>
+  <rect x="410" y="60" width="60" height="22" rx="4" fill="#9a9a9a"/>
+  <text x="440" y="76" text-anchor="middle" font-size="12" fill="#1a1a1a">USB-C</text>
+  <text x="440" y="180" text-anchor="middle" class="silkb">XIAO (U1)</text>
+  <text x="440" y="200" text-anchor="middle" class="silk">soldered direct</text>
+
+  <!-- BTN1 -->
+  <text x="240" y="98" class="silkb">BTN1</text>
+  <rect x="239" y="109" width="22" height="22" class="pad"/>
+  <circle cx="250" cy="160" r="11" class="pad"/>
+  <text x="268" y="125" class="silk">1</text>
+  <text x="268" y="165" class="silk">2 GND</text>
+
+  <!-- LED1 -->
+  <text x="240" y="208" class="silkb">LED1</text>
+  <rect x="239" y="219" width="22" height="22" class="pad"/>
+  <circle cx="250" cy="270" r="11" class="pad"/>
+  <text x="268" y="235" class="silk">1 LED+</text>
+  <text x="268" y="275" class="silk">2 GND</text>
+
+  <!-- ADS1115 footprint: pin 10 left ... pin 1 right -->
+  <text x="300" y="332" class="silk">ADS1115: VDD (pin 1) is the right-most pin</text>
+  <rect x="300" y="340" width="360" height="44" rx="4" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <circle cx="320" cy="362" r="10" class="pad"/>
+  <circle cx="355" cy="362" r="10" class="pad"/>
+  <circle cx="390" cy="362" r="10" class="pad"/>
+  <circle cx="425" cy="362" r="10" class="pad"/>
+  <circle cx="460" cy="362" r="10" class="pad"/>
+  <circle cx="495" cy="362" r="10" class="pad"/>
+  <circle cx="530" cy="362" r="10" class="pad"/>
+  <circle cx="565" cy="362" r="10" class="pad"/>
+  <circle cx="600" cy="362" r="10" class="pad"/>
+  <rect x="630" y="352" width="20" height="20" class="pad"/>
+  <text x="320" y="402" text-anchor="middle" class="silk">10</text>
+  <text x="600" y="402" text-anchor="middle" class="silk">GND</text>
+  <text x="640" y="402" text-anchor="middle" class="silk">VDD</text>
+
+  <!-- J2 servo, right edge, right-angle -->
+  <text x="672" y="428" text-anchor="end" class="silkb">J2 SERVO</text>
+  <rect x="649" y="439" width="22" height="22" class="pad"/>
+  <circle cx="660" cy="490" r="11" class="pad"/>
+  <circle cx="660" cy="530" r="11" class="pad"/>
+  <circle cx="660" cy="570" r="11" class="pad"/>
+  <text x="640" y="455" text-anchor="end" class="silk">1 PWM</text>
+  <text x="640" y="495" text-anchor="end" class="silk">2 +5V</text>
+  <text x="640" y="535" text-anchor="end" class="silk">3 GND</text>
+  <text x="640" y="575" text-anchor="end" class="silk">4 FB</text>
+
+  <!-- 5V input terminal -->
+  <text x="240" y="455" class="silkb">5V IN</text>
+  <rect x="239" y="469" width="22" height="22" class="pad"/>
+  <circle cx="250" cy="520" r="11" class="pad"/>
+  <text x="268" y="485" class="silk">1 +5V</text>
+  <text x="268" y="525" class="silk">2 GND</text>
+
+  <!-- C1 470uF -->
+  <path d="M348 560 A42 42 0 0 1 432 560 Z" fill="#f2f2f2"/>
+  <path d="M348 560 A42 42 0 0 0 432 560 Z" fill="#8f8f8f"/>
+  <circle cx="390" cy="560" r="42" fill="none" stroke="#ffffff" stroke-width="2"/>
+  <text x="390" y="548" text-anchor="middle" font-size="22" font-weight="bold" fill="#1a1a1a">+</text>
+  <text x="390" y="585" text-anchor="middle" font-size="22" font-weight="bold" fill="#ffffff">−</text>
+  <text x="390" y="628" text-anchor="middle" class="silk">C1 470µF: stripe → shaded half</text>
+
+  <!-- J4 ACS758 header -->
+  <text x="535" y="574" text-anchor="middle" class="silkb">J4 ACS758</text>
+  <rect x="489" y="599" width="22" height="22" class="pad"/>
+  <circle cx="535" cy="610" r="11" class="pad"/>
+  <circle cx="570" cy="610" r="11" class="pad"/>
+  <text x="500" y="593" text-anchor="middle" font-size="11" fill="#ffffff">+5V</text>
+  <text x="535" y="593" text-anchor="middle" font-size="11" fill="#ffffff">GND</text>
+  <text x="570" y="593" text-anchor="middle" font-size="11" fill="#ffffff">SIG</text>
+
+  <!-- Pushbutton -->
+  <rect x="25" y="105" width="165" height="185" rx="8" class="box"/>
+  <text x="107" y="128" text-anchor="middle" class="lblb">Illuminated</text>
+  <text x="107" y="146" text-anchor="middle" class="lblb">pushbutton</text>
+  <text x="38" y="178" class="lbl">Switch: any two</text>
+  <text x="38" y="194" class="lbl">same-side terminals</text>
+  <text x="38" y="234" class="lbl">LED + (anode)</text>
+  <text x="38" y="266" class="lbl">LED − (cathode,</text>
+  <text x="38" y="282" class="lbl">"line" side of symbol)</text>
+  <path d="M190 172 L239 120" class="sig"/>
+  <path d="M190 190 L239 160" class="gnd"/>
+  <path d="M190 230 L239 230" class="sig"/>
+  <path d="M190 268 L239 270" class="gnd"/>
+  <text x="107" y="306" text-anchor="middle" font-size="12" fill="#555">leads end in Dupont connectors</text>
+
+  <!-- Barrel jack -->
+  <rect x="25" y="455" width="165" height="90" rx="8" class="box"/>
+  <text x="107" y="478" text-anchor="middle" class="lblb">5V DC socket</text>
+  <text x="40" y="500" class="lbl">+ (red)</text>
+  <text x="40" y="530" class="lbl">− (black)</text>
+  <path d="M190 496 L239 480" class="v5"/>
+  <path d="M190 526 L239 520" class="gnd"/>
+  <text x="107" y="565" text-anchor="middle" font-size="12" fill="#555">optional: or power the XIAO</text>
+  <text x="107" y="580" text-anchor="middle" font-size="12" fill="#555">from a 2A USB-C adapter</text>
+
+  <!-- Servo -->
+  <path d="M671 450 H760" class="sig"/>
+  <path d="M671 490 H760" class="v5"/>
+  <path d="M671 530 H760" class="gnd"/>
+  <path d="M671 570 H760" class="fb"/>
+  <rect x="760" y="425" width="215" height="170" rx="8" class="box"/>
+  <text x="868" y="448" text-anchor="middle" class="lblb">Feedback servo</text>
+  <text x="775" y="455" class="lbl" dy="0"></text>
+  <text x="775" y="475" class="lbl">PWM → pin 1</text>
+  <text x="775" y="497" class="lbl">+5V → pin 2</text>
+  <text x="775" y="535" class="lbl">GND → pin 3</text>
+  <text x="775" y="567" class="lbl">FB → pin 4 (ferrite</text>
+  <text x="775" y="583" class="lbl">data cable)</text>
+
+  <!-- ACS758 module -->
+  <rect x="420" y="705" width="300" height="95" rx="8" fill="#3b3f9e"/>
+  <circle cx="470" cy="705" r="10" class="pad"/>
+  <circle cx="505" cy="705" r="10" class="pad"/>
+  <circle cx="540" cy="705" r="10" class="pad"/>
+  <circle cx="575" cy="705" r="10" class="pad"/>
+  <text x="470" y="735" text-anchor="middle" font-size="12" fill="#ffffff">1 5V</text>
+  <text x="505" y="752" text-anchor="middle" font-size="12" fill="#ffffff">2 GND</text>
+  <text x="540" y="735" text-anchor="middle" font-size="12" fill="#ffffff">3 —</text>
+  <text x="575" y="752" text-anchor="middle" font-size="12" fill="#ffffff">4 OUT</text>
+  <text x="650" y="740" text-anchor="middle" font-size="14" font-weight="bold" fill="#ffffff">ACS758</text>
+  <text x="570" y="785" text-anchor="middle" font-size="12" fill="#dfe2ff">IP+ / IP− screw terminal: see AC wiring diagram</text>
+  <path d="M470 695 L500 621" class="v5"/>
+  <path d="M505 695 L535 621" class="gnd"/>
+  <path d="M575 695 L570 621" class="sig"/>
+  <path d="M540 695 V675" stroke="#888" stroke-width="3"/>
+  <path d="M532 662 L548 678 M548 662 L532 678" stroke="#c0392b" stroke-width="3"/>
+  <text x="300" y="690" text-anchor="end" font-size="12" fill="#555"></text>
+
+  <!-- Warning -->
+  <rect x="740" y="660" width="240" height="120" rx="8" fill="#fdecea" stroke="#c0392b" stroke-width="2"/>
+  <text x="755" y="684" font-size="14" font-weight="bold" fill="#a12a1f">J4 is unkeyed</text>
+  <text x="755" y="706" font-size="12" fill="#1a1a1a">Match 5V → 5V, GND → GND,</text>
+  <text x="755" y="724" font-size="12" fill="#1a1a1a">module pin 4 → SIG.</text>
+  <text x="755" y="742" font-size="12" fill="#1a1a1a">Module pin 3 is not used.</text>
+  <text x="755" y="760" font-size="12" fill="#1a1a1a">Reversed, it can damage</text>
+  <text x="755" y="776" font-size="12" fill="#1a1a1a">the sensor.</text>
+
+  <!-- Legend -->
+  <g font-size="12" fill="#1a1a1a">
+    <line x1="25" y1="660" x2="55" y2="660" class="v5"/><text x="62" y="664">+5V</text>
+    <line x1="25" y1="682" x2="55" y2="682" class="gnd"/><text x="62" y="686">GND</text>
+    <line x1="25" y1="704" x2="55" y2="704" class="sig"/><text x="62" y="708">signal</text>
+    <line x1="25" y1="726" x2="55" y2="726" class="fb"/><text x="62" y="730">servo feedback</text>
+    <rect x="28" y="742" width="14" height="14" class="pad"/><text x="62" y="754">square pad = pin 1</text>
+  </g>
+</svg>
