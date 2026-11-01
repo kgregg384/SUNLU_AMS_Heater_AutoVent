@@ -34,7 +34,7 @@ A step-by-step, photo-illustrated guide to assembling an AutoVent and installing
 
 ### Parts
 
-The parts list, with quantities and buy links, is the **[Bill of Materials on 3dcreator.shop](https://3dcreator.shop/docs/build-guide)**. The tables below follow it, with corrections for the latest PCB where the BOM is out of date (headers and power adapter). The DIY kit includes everything except the 5V power adapter.
+The parts list, with quantities and buy links, is the **[Bill of Materials on 3dcreator.shop](https://3dcreator.shop/docs/build-guide)**. The tables below follow it, with corrections for the latest PCB where the BOM is out of date (headers and power adapter). The DIY kit includes everything except the 5V power adapter and the 3D printed parts (printed parts and gaskets are optional add-ons).
 
 Lay everything out before you start so you're not hunting for parts mid-solder.
 
@@ -69,6 +69,7 @@ Lay everything out before you start so you're not hunting for parts mid-solder.
 | 1 | 2.54mm 2-Position Screw Terminal | PCB 5V power input |
 | 1 | 5mm 2-Position Screw Terminal | ACS758 AC connection |
 | — | 22 AWG hookup wire | Leads for the 5V socket |
+| 1 | Screw & Nut Pack | 2× M2 screws + nuts (servo mount), 3× M3 screws (lid) |
 | — | Leads with Dupont connectors | Soldered to the pushbutton and LED; the connector end plugs onto the PCB's 2-pin headers |
 
 > **The BOM's header list is out of date.** All headers are **straight**: a 4-pin on the ACS758 module, a 3-pin for the ACS758 on the main PCB and a 4-pin for the servo, as listed above.
@@ -79,7 +80,6 @@ Lay everything out before you start so you're not hunting for parts mid-solder.
 |-----|-----------|-------|
 | 1 | 5V Power Adapter | Powers the controller. Either a barrel-plug adapter rated over 1A (the BOM lists 2A), **or** a quality 2A USB-C adapter plugged into the XIAO, in which case you can skip the barrel jack. See [Powering the controller](#powering-the-controller) |
 | — | 3D printed parts | Enclosure, lid, vent base, vent cover, gear, TPU gaskets. [AutoVent 2.0 on MakerWorld](https://makerworld.com/en/models/2344707-autovent-2-0-for-sunlu-ams-heater#profileId-2563439) (V1 is [here](https://makerworld.com/en/models/2038244-sunlu-ams-heater-autovent#profileId-2198796)). Printed parts and TPU gaskets are also sold at [3dcreator.shop](https://3dcreator.shop) |
-| — | M2 screws and nuts | Servo and board mounting |
 | — | Heat-shrink tubing | Barrel jack and AC joints |
 
 > The firmware also runs on a Seeed XIAO SAMD21 (same pinout) if you're sourcing your own parts. See [Upload Firmware](README.md#upload-firmware).
@@ -253,7 +253,7 @@ Use **at least 18 AWG** wire anywhere AC current flows, including the path throu
 
    ![Soldering the AC connections](docs/images/build-guide/17-ac-plug-solder.jpg)
 
-2. **Feed the C7 cable in through the power opening** and tie a **strain-relief knot** just inside the wall so a pull on the cord can't reach the solder joints or terminals. The C7 cable and C8 inlet are two-conductor, so there is no ground wire to connect.
+2. **Feed the C7 cable in through the power opening.** Slide the **TPU power cable grommet** onto the cord where it passes through the wall (the video adds it at 17:38), then tie a **strain-relief knot** just inside the wall so a pull on the cord can't reach the solder joints or terminals. The C7 cable and C8 inlet are two-conductor, so there is no ground wire.
 
    ![AC cord through the enclosure wall](docs/images/build-guide/18-ac-cord-entry.jpg)
 
