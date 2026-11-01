@@ -34,7 +34,7 @@ A step-by-step, photo-illustrated guide to assembling an AutoVent and installing
 
 ### Parts
 
-The parts list, with quantities and buy links, is the **[Bill of Materials on 3dcreator.shop](https://3dcreator.shop/docs/build-guide)**. The tables below follow it, with corrections for the latest PCB where the BOM is out of date (headers and power adapter). The DIY kit includes everything except the 5V power adapter and the 3D printed parts (printed parts and gaskets are optional add-ons).
+The parts list, with quantities and buy links, is the **[Bill of Materials on 3dcreator.shop](https://3dcreator.shop/docs/build-guide)**. The tables below follow it. The DIY kit includes everything except the 5V power adapter and the 3D printed parts (printed parts and gaskets are optional add-ons).
 
 Lay everything out before you start so you're not hunting for parts mid-solder.
 
@@ -71,8 +71,6 @@ Lay everything out before you start so you're not hunting for parts mid-solder.
 | — | 22 AWG hookup wire | Leads for the 5V socket |
 | 1 | Screw & Nut Pack | 2× M2 screws + nuts (servo mount), 3× M3 screws (lid) |
 | — | Leads with Dupont connectors | Soldered to the pushbutton and LED; the connector end plugs onto the PCB's 2-pin headers |
-
-> **The BOM's header list is out of date.** All headers are **straight**: a 4-pin on the ACS758 module, a 3-pin for the ACS758 on the main PCB and a 4-pin for the servo, as listed above.
 
 **Not included in the kit**
 
