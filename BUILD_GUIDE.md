@@ -347,7 +347,23 @@ A cheap or weak USB-C adapter can sag when the servo moves, so use a good one.
 
 On the very first boot the controller **finds the vent's stops automatically** and saves the servo travel limits. The LED flashes while the vent moves slowly to each end, then goes **solid** when it's ready (about 20–30 seconds extra on first boot; later boots take about 10 seconds).
 
-If the LED **double-blinks** instead, the automatic setup failed and the vent won't move until the limits are set. See [Servo Setup](USER_GUIDE.md#servo-setup).
+If the LED **double-blinks** instead, the automatic setup failed and the vent won't move until the limits are set. Set them by hand with Jog Mode (below).
+
+### Setting the servo limits by hand (Jog Mode)
+
+Use Jog Mode if Auto Find failed (LED double-blinks, status shows `SERVO NOT SET UP`), or if the vent strains at either end or doesn't fully close or open. Jog Mode stops the servo just short of each hard stop so it never stalls there. Automatic vent control and the button are paused while you jog.
+
+Connect over USB-C and open the [Serial Monitor app](SerialMonitor/README.md), then:
+
+1. Click **Jog Mode** (or send `J`).
+2. Step toward the **closed** end with **+1° / −1°** (`+` / `-`) or **+5° / −5°** (`>` / `<`) until the vent stops moving. A warning prints when the feedback stops following.
+3. **Back off about 10–15°** from that stop, then click **Set Closed** (`C`).
+4. Do the same at the **open** end and click **Set Open** (`O`).
+5. Click **Save** (`W`). The controller checks the new limits and returns to automatic control.
+
+**Cancel** (`Q`) leaves without changing anything. **Defaults** (`D`) deletes the saved limits, so the next calibration runs Auto Find again. Saved limits survive power loss.
+
+You can also re-run the automatic search at any time with **Auto Find** (`A`), then **Save** (`W`). Full details are in [Servo Setup](USER_GUIDE.md#servo-setup).
 
 ### Learning mode
 
