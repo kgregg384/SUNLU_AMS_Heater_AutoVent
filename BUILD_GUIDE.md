@@ -48,7 +48,7 @@ Lay everything out before you start so you're not hunting for parts mid-solder.
 | 1 | Seeed XIAO RP2040 | Main microcontroller |
 | 1 | ADS1115 16-bit ADC Module | Analog-to-digital converter |
 | 1 | ACS758 Current Sensor Module | 50A Hall-effect sensor |
-| 1 | 5V Feedback Servo | 4-lead servo with position feedback |
+| 1 | 5V Feedback Servo | **Micro 9g size** (body about 23 × 12 × 32.5 mm), 4-lead with analog position feedback. The BOM part is the DFRobot SER0046 (9g metal-gear servo with analog feedback). A different servo must fit the same micro 9g mount and have a feedback lead |
 | 1 | 470µF Electrolytic Capacitor | Power filtering (polarized) |
 | 1 | Mini Illuminated Pushbutton | V2.0 lighted power switch (button + status LED). Adafruit 3104 and 3105 are the same button in different colors; either works |
 | 1 | C8 Panel Mount Power Inlet | AC power input |
