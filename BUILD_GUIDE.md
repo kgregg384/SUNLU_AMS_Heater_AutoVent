@@ -160,7 +160,7 @@ Every connector on the Rev 2.0 PCB and what plugs into it. Square pads are pin 1
 
    ![Soldering the ADS1115 header](docs/images/build-guide/09-ads-header.jpg)
 
-2. **Mount the ADS1115 on the main PCB, leaving clearance.** Before soldering, plug an empty Dupont connector (or the sensor cable) onto the 3-pin ACS758 header, and make sure the ADS1115 sits high enough that the plug still fits underneath. Usually that leaves a little lead showing under the board.
+2. **Mount the ADS1115 on the main PCB.** Push it down flat against the PCB and solder from the underside. (The board in the video needed a gap underneath for the ACS758 plug; the latest PCB doesn't.)
 
    ![ADS1115 next to the XIAO](docs/images/build-guide/10-ads-placement.jpg)
 
