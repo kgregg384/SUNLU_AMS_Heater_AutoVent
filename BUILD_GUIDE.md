@@ -65,13 +65,13 @@ Lay everything out before you start so you're not hunting for parts mid-solder.
 | 1 | 4-pin straight header | On the ACS758 module |
 | 1 | 3-pin straight header | ACS758 connection on the main PCB (latest PCB; the board in the video uses a 3-pin right-angle header) |
 | 2 | 2-pin Dupont headers | Main PCB: pushbutton and LED |
-| 1 | 4-pin 90° Right-Angle Header | Servo |
+| 1 | 4-pin straight header | Servo |
 | 1 | 2.54mm 2-Position Screw Terminal | PCB 5V power input |
 | 1 | 5mm 2-Position Screw Terminal | ACS758 AC connection |
 | — | 22 AWG hookup wire | Leads for the 5V socket |
 | — | Leads with Dupont connectors | Soldered to the pushbutton and LED; the connector end plugs onto the PCB's 2-pin headers |
 
-> **The BOM's header list is out of date.** It shows two 3-pin right-angle headers for the ACS758. The latest PCB uses a **4-pin straight header on the ACS758 module** and a **3-pin straight header on the main PCB**, as listed above.
+> **The BOM's header list is out of date.** It shows right-angle headers for the ACS758 and the servo. The latest PCB uses **straight headers throughout**: a 4-pin on the ACS758 module, a 3-pin for the ACS758 on the main PCB and a 4-pin for the servo, as listed above.
 
 **Not included in the kit**
 
@@ -127,14 +127,14 @@ The main PCB gets these connector headers:
 | Header | Location | Connects to |
 |--------|----------|-------------|
 | 2-pin Dupont (×2) | Top | Pushbutton switch and its LED |
-| 4-pin 90° right-angle | Right side | Servo |
+| 4-pin straight | Right side | Servo |
 | 3-pin straight | Bottom | ACS758 current sensor (J4) |
 
-The board in the video is an earlier revision with a **right-angle** 3-pin header for the ACS758. The latest PCB uses a **straight** 3-pin header. Go by the silkscreen on your board.
+The board in the video is an earlier revision with **right-angle** headers for the ACS758 and the servo. The latest PCB uses **straight** headers for both. Go by the silkscreen on your board.
 
 > **Option:** instead of a header and cable, you can solder the ACS758 module directly to the PCB with wire leads. See [ACS758 connections](#acs758-connections).
 
-**Orientation:** the **long side of the pins faces away from the board** and the short side goes through the holes. The Dupont connectors plug onto the long side. Match the right-angle servo header's direction to the silkscreen.
+**Orientation:** the **long side of the pins faces away from the board** and the short side goes through the holes. The Dupont connectors plug onto the long side.
 
 **Technique:** seat the header, tack one pin with a little solder, then reheat that joint while you push the header square to the board with your other hand. Once it's at 90°, solder the rest of the pins.
 
@@ -284,7 +284,7 @@ Use **at least 18 AWG** wire anywhere AC current flows, including the path throu
 
 3. **Install the 5V DC socket** (skip this if you're powering over USB-C). Push it through its hole, put the nut on and tighten. Connect its leads to the main board's 2.54mm 2-position screw terminal (5V IN): **red (+) to pin 1, +5V (square pad)**, and **black (−) to pin 2, GND**. With the board mounted in the enclosure as in the video, that puts ground on top and 5V on the bottom. See the [connection map](#connection-map).
 
-4. **Connect the servo** to the 4-pin right-angle header, checking that signal, power and ground line up with the silkscreen. Connect the **button** and **LED** leads to their headers. The kit's **data cable with ferrite core** carries the servo feedback signal; install it with the ferrite core in place.
+4. **Connect the servo** to the 4-pin header (J2), checking that signal, power and ground line up with the silkscreen. Connect the **button** and **LED** leads to their headers. The kit's **data cable with ferrite core** carries the servo feedback signal; install it with the ferrite core in place.
 
    ![Low-voltage wiring](docs/images/build-guide/20-low-voltage-wiring.jpg)
 
