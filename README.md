@@ -7,8 +7,8 @@ An intelligent, automatic vent controller for SUNLU AMS 3D printer filament drye
 The controller uses a hall-effect current sensor (ACS758) to non-invasively monitor your dryer's power consumption. A 16-bit ADC (ADS1115) provides precise current measurements, allowing the system to distinguish between three states:
 
 - **Heater + Fan running** — vent opens immediately
-- **Fan only** — vent stays open for cooling
-- **Idle** — vent closes after a 3-minute cooldown delay
+- **Fan only** (after the heater stops) — vent stays open for a 3-minute cooldown, then closes
+- **Idle** — vent closes immediately
 
 A self-learning calibration mode lets the controller adapt to your specific dryer model by measuring the actual current signatures.
 
@@ -177,6 +177,7 @@ On first startup (or any calibration with no saved limits) the controller runs *
 
 ## Documentation
 
+- **[Build Guide](BUILD_GUIDE.md)** — Photo-illustrated assembly and installation, step by step
 - **[User Guide](USER_GUIDE.md)** — Setup, operation, troubleshooting, and maintenance
 - **[Technical Specification](TECHNICAL_SPECIFICATION.md)** — Algorithms, timing, hardware details, and architecture
 

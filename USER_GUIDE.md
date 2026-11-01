@@ -37,8 +37,7 @@ The system works by monitoring the electrical current drawn by your dryer and le
 - ADS1115 ADC module
 - ACS758 LCB-050B current sensor
 - Feedback-enabled servo motor
-- Momentary push button
-- LED and resistor
+- Illuminated momentary pushbutton (button + status LED in one part — Adafruit 3105); series resistors are on the PCB
 - USB-C cable for power
 - 5V USB power source (1A minimum)
 - Wire for connections
@@ -88,9 +87,9 @@ The system works by monitoring the electrical current drawn by your dryer and le
    - Turn on your dryer
    - The vent should open when the heater activates
    - Turn off the heater (fan continues)
-   - The vent should stay open
-   - Turn off the fan
-   - The vent should close after 3 minutes
+   - The vent should stay open, then close after 3 minutes if the fan is still running
+   - Turn the dryer fully off (heater and fan)
+   - The vent should close right away
 
 **That's it!** Your Auto-Vent Controller is now ready for normal use.
 
@@ -288,32 +287,31 @@ Once learning is complete, the controller works automatically. Here's what to ex
 
 **When Dryer Starts:**
 - Heater turns on → Vent opens immediately
-- Fan starts → Vent opens immediately
+- Fan alone does not open the vent
 
 **During Drying Cycle:**
-- Vent stays open as long as heater or fan is running
+- Vent stays open while the heater is running
 - No manual intervention needed
 
 **When Heater Turns Off (fan continues):**
-- Vent stays open
-- This is normal - fan cools down the heater
+- Vent stays open for 3 more minutes (cooldown delay)
+- Then vent automatically closes, even if the fan is still running
+- This lets the fan clear warm, moist air before the vent closes
 
 **When Everything Turns Off:**
-- Vent stays open for 3 more minutes (cooldown delay)
-- Then vent automatically closes
-- This protects your fan bearing from thermal shock
+- Vent closes immediately
 
 ### What You Should See
 
 **Normal Behavior:**
 - LED is solid ON during operation
-- Vent opens when you start the dryer
-- Vent stays open while dryer runs
-- Vent closes a few minutes after dryer stops
+- Vent opens when the heater comes on
+- Vent stays open while the heater runs
+- Vent closes 3 minutes after the heater stops if the fan keeps running, or right away if the dryer turns fully off
 
 **Expected Delays:**
 - Vent may take 1-2 seconds to fully open/close
-- 3-minute cooldown delay before closing is intentional
+- 3-minute cooldown delay after the heater stops (fan still running) is intentional
 
 ### Manual Control (if needed)
 
@@ -358,7 +356,8 @@ Click **Cancel** to leave without changing anything, or **Defaults** to delete s
    - If still stuck: Check servo power connection
 
 4. **Current sensor not reading**
-   - Check: Verify sensor is clipped around ONE power wire
+   - Check: With the dryer unplugged, verify one AC conductor runs through the ACS758's IP+ and IP− screw terminals and both screws are tight
+   - Check: Verify the sensor cable is plugged into the main board's 3-pin header the right way round (5V to 5V, GND to GND, signal to signal)
    - Solution: Reconnect sensor, restart controller
 
 ### Problem: Vent doesn't close after dryer stops
@@ -366,8 +365,8 @@ Click **Cancel** to leave without changing anything, or **Defaults** to delete s
 **Possible Causes & Solutions:**
 
 1. **Cooldown delay active**
-   - This is normal! Wait the full 3 minutes
-   - Small parasitic loads can keep vent open
+   - If the fan is still running after the heater stopped, this is normal! Wait the full 3 minutes
+   - Small parasitic loads can make the controller think the fan is still running
 
 2. **Dryer still drawing current**
    - Check: Does the dryer have a display or light still on?
@@ -389,8 +388,8 @@ Click **Cancel** to leave without changing anything, or **Defaults** to delete s
    - Solution: Wait for system to stabilize (30-60 seconds)
 
 3. **Loose sensor connection**
-   - Check: Ensure current sensor is firmly clamped
-   - Solution: Reposition sensor, secure with zip tie
+   - Check: With the dryer unplugged, ensure the IP+ / IP− terminal screws are tight and the sensor cable is fully seated
+   - Solution: Retighten the terminals and reseat the cable
 
 ### Problem: LED flashing patterns don't match guide
 
